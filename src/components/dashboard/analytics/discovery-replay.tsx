@@ -1,4 +1,5 @@
 import type { DiscoveryReplayStats, DiscoveryReplayMonth } from "@/lib/listening-analytics";
+import { chartOpacityFromCount } from "@/utils/chart-intensity";
 import { formatCompact, formatPercent } from "@/utils/format";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
@@ -37,8 +38,8 @@ export function DiscoveryReplay({ analytics }: { analytics: DiscoveryReplayStats
       />
       <Legend
         items={[
-          { label: "New", className: "bg-primary" },
-          { label: "Repeat", className: "bg-chart-3" },
+          { label: "New", className: "bg-chart-1" },
+          { label: "Repeat", className: "bg-chart-2" },
           { label: "Heavy", className: "bg-chart-4" },
         ]}
       />
@@ -50,6 +51,8 @@ export function DiscoveryReplay({ analytics }: { analytics: DiscoveryReplayStats
 function StackedReplayBars({ months }: { months: DiscoveryReplayMonth[] }) {
   if (months.length === 0) return <EmptyChart />;
 
+  const maxTotal = Math.max(1, ...months.map((month) => month.total));
+
   return (
     <div className="flex h-24 items-end gap-1">
       {months.map((month) => (
@@ -57,7 +60,8 @@ function StackedReplayBars({ months }: { months: DiscoveryReplayMonth[] }) {
           <TooltipTrigger
             render={
               <div
-                className="flex h-full flex-1 flex-col justify-end overflow-hidden rounded-sm bg-muted/50 outline-none ring-primary/30 transition-opacity hover:opacity-80 focus-visible:ring-2"
+                className="flex h-full flex-1 flex-col justify-end overflow-hidden rounded-sm bg-chart-track outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100 focus-visible:ring-2"
+                style={{ opacity: chartOpacityFromCount(month.total, maxTotal) }}
                 tabIndex={0}
               />
             }
@@ -69,13 +73,13 @@ function StackedReplayBars({ months }: { months: DiscoveryReplayMonth[] }) {
               }}
             />
             <div
-              className="bg-chart-3"
+              className="bg-chart-2"
               style={{
                 height: `${month.total > 0 ? (month.repeatPlays / month.total) * 100 : 0}%`,
               }}
             />
             <div
-              className="bg-primary"
+              className="bg-chart-1"
               style={{
                 height: `${month.total > 0 ? (month.newPlays / month.total) * 100 : 0}%`,
               }}

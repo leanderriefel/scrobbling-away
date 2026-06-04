@@ -131,13 +131,28 @@ export const syncLastFmStats = async (
     }
 
     await emitProgress(context, {
+      phase: "snapshot",
+      message: "Preparing stats",
+      fetched: 0,
+      total: undefined,
+    });
+
+    const snapshot = await publishSnapshot(context, onSnapshot);
+
+    await emitProgress(context, {
       status: "complete",
       phase: "complete",
       message: "Full cache is up to date",
+      fetched: 1,
+      total: 1,
       completedAt: new Date().toISOString(),
     });
 
-    return await publishSnapshot(context, onSnapshot);
+    return {
+      ...snapshot,
+      sync: context.current,
+      updatedAt: context.current.updatedAt,
+    };
   } catch (error) {
     if (isAbortError(error)) {
       await emitProgress(context, {

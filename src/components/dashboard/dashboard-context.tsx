@@ -29,6 +29,10 @@ export function useDashboardSnapshot() {
   return useDashboardContext().snapshot;
 }
 
+export function useOptionalDashboardSnapshot() {
+  return useContext(DashboardContext)?.snapshot;
+}
+
 export function useDashboardPeriod() {
   const { selectedPeriod, setSelectedPeriod } = useDashboardContext();
 

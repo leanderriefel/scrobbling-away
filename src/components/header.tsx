@@ -11,7 +11,7 @@ export default function Header() {
           Scrobbling Away
         </Link>
       </div>
-      <div className="divider-fade" />
+      <div className="h-px bg-border" />
     </header>
   );
 }

@@ -67,10 +67,10 @@ export function SyncBar({
           <StatusIcon
             className={
               active
-                ? "size-3 animate-spin text-primary/60"
+                ? "size-3 animate-spin text-muted-foreground"
                 : status === "error"
                   ? "size-3 text-destructive"
-                  : "size-3 text-primary/60"
+                  : "size-3 text-muted-foreground"
             }
           />
         )}

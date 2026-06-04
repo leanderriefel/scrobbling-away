@@ -10,6 +10,7 @@ import {
 } from "@/lib/listening-analytics";
 
 export const LASTFM_PERIODS = ["overall", "7day", "1month", "3month", "6month", "12month"] as const;
+const SNAPSHOT_TOP_RANKING_LIMIT = 200;
 
 export type LastFmPeriod = (typeof LASTFM_PERIODS)[number];
 
@@ -136,6 +137,7 @@ export type LastFmDerivedStats = {
   scrobblesByYear: TimeBucket[];
   scrobblesByHour: TimeBucket[];
   scrobblesByWeekday: TimeBucket[];
+  scrobblesByMonthOfYear: TimeBucket[];
 };
 
 export type PeriodLeaders = Record<
@@ -247,6 +249,7 @@ export const createEmptyDerivedStats = (): LastFmDerivedStats => ({
   topTracksFromHistory: [],
   scrobblesByHour: [],
   scrobblesByWeekday: [],
+  scrobblesByMonthOfYear: [],
   scrobblesByYear: [],
 });
 
@@ -661,17 +664,32 @@ export const buildStatsSnapshot = async (username: string): Promise<LastFmStatsS
 
   await Promise.all(
     LASTFM_PERIODS.flatMap((period) => [
-      topRowsByPeriod(lastFmStatsDb.topArtists, usernameLower, period, 25).then((rows) => {
+      topRowsByPeriod(
+        lastFmStatsDb.topArtists,
+        usernameLower,
+        period,
+        SNAPSHOT_TOP_RANKING_LIMIT,
+      ).then((rows) => {
         const artists = sortByRank(rows.map((row) => row.artist));
         topArtists[period] = artists;
         periodLeaders[period].artist = artists[0];
       }),
-      topRowsByPeriod(lastFmStatsDb.topAlbums, usernameLower, period, 25).then((rows) => {
+      topRowsByPeriod(
+        lastFmStatsDb.topAlbums,
+        usernameLower,
+        period,
+        SNAPSHOT_TOP_RANKING_LIMIT,
+      ).then((rows) => {
         const albums = sortByRank(rows.map((row) => row.album));
         topAlbums[period] = albums;
         periodLeaders[period].album = albums[0];
       }),
-      topRowsByPeriod(lastFmStatsDb.topTracks, usernameLower, period, 25).then((rows) => {
+      topRowsByPeriod(
+        lastFmStatsDb.topTracks,
+        usernameLower,
+        period,
+        SNAPSHOT_TOP_RANKING_LIMIT,
+      ).then((rows) => {
         const tracks = sortByRank(rows.map((row) => row.track));
         topTracks[period] = tracks;
         periodLeaders[period].track = tracks[0];

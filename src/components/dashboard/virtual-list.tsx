@@ -7,6 +7,7 @@ export function VirtualList<TItem>({
   className,
   emptyMessage = "Nothing here yet",
   estimateSize = 53,
+  getItemKey,
   height = "24rem",
   items,
   overscan = 8,
@@ -15,6 +16,7 @@ export function VirtualList<TItem>({
   className?: string;
   emptyMessage?: string;
   estimateSize?: number;
+  getItemKey?: (item: TItem, index: number) => string | number;
   height?: string;
   items: TItem[];
   overscan?: number;
@@ -25,6 +27,11 @@ export function VirtualList<TItem>({
     count: items.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => estimateSize,
+    getItemKey: (index) => {
+      const item = items[index];
+
+      return item && getItemKey ? getItemKey(item, index) : index;
+    },
     overscan,
   });
 
@@ -38,7 +45,7 @@ export function VirtualList<TItem>({
     <div
       ref={parentRef}
       className={cn(
-        "overflow-y-auto rounded-sm outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "scrollbar-thin overflow-y-auto rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
         className,
       )}
       style={{ height }}

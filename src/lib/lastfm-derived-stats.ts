@@ -1,5 +1,6 @@
 import type { TopAlbum, TopArtist, TopTrack, UserInfo } from "@/lib/lastfm";
 import { deriveListeningAnalytics } from "@/lib/listening-analytics";
+import { MONTH_LABELS } from "@/utils/calendar-labels";
 import type {
   CachedRecentTrack,
   LastFmDerivedStats,
@@ -45,6 +46,7 @@ export const deriveLastFmStats = ({
   const years = new Map<string, number>();
   const hours = new Map<string, number>();
   const weekdays = new Map<string, number>();
+  const monthsOfYear = new Map<number, number>();
   let lovedTracks = 0;
   let firstScrobble: CachedRecentTrack | undefined;
   let lastScrobble: CachedRecentTrack | undefined;
@@ -73,6 +75,8 @@ export const deriveLastFmStats = ({
     years.set(year, (years.get(year) ?? 0) + 1);
     hours.set(hour, (hours.get(hour) ?? 0) + 1);
     weekdays.set(weekday, (weekdays.get(weekday) ?? 0) + 1);
+    const monthIndex = playedAt.getMonth();
+    monthsOfYear.set(monthIndex, (monthsOfYear.get(monthIndex) ?? 0) + 1);
 
     incrementRanked(artistStats, artistKey, {
       imageUrl: getImageUrl(recentTrack.track.images),
@@ -114,6 +118,10 @@ export const deriveLastFmStats = ({
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, count]) => ({ label, count })),
     scrobblesByWeekday: [...weekdays.entries()].map(([label, count]) => ({ label, count })),
+    scrobblesByMonthOfYear: MONTH_LABELS.map((label, index) => ({
+      label,
+      count: monthsOfYear.get(index) ?? 0,
+    })),
     scrobblesByYear: [...years.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, count]) => ({ label, count })),

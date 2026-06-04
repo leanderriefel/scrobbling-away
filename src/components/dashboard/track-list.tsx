@@ -14,14 +14,18 @@ export type TrackListItem = {
   href?: string;
 };
 
+const getTrackItemKey = (item: TrackListItem) => item.id;
+
 export function TrackList({
   items,
   emptyMessage = "Nothing here yet",
   height = "24rem",
+  onItemClick,
 }: {
   items: TrackListItem[];
   emptyMessage?: string;
   height?: string;
+  onItemClick?: (item: TrackListItem) => void;
 }) {
   if (items.length === 0) {
     return <div className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</div>;
@@ -30,14 +34,21 @@ export function TrackList({
   return (
     <VirtualList
       emptyMessage={emptyMessage}
+      getItemKey={getTrackItemKey}
       height={height}
       items={items}
-      renderItem={(item) => <TrackRow item={item} />}
+      renderItem={(item) => <TrackRow item={item} onItemClick={onItemClick} />}
     />
   );
 }
 
-function TrackRow({ item }: { item: TrackListItem }) {
+function TrackRow({
+  item,
+  onItemClick,
+}: {
+  item: TrackListItem;
+  onItemClick?: (item: TrackListItem) => void;
+}) {
   const content = (
     <>
       <span className="w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground/30">
@@ -71,6 +82,18 @@ function TrackRow({ item }: { item: TrackListItem }) {
 
   const className =
     "flex min-w-0 items-center gap-3 rounded-sm px-2 py-2 transition-colors duration-150 hover:bg-accent/60";
+
+  if (onItemClick) {
+    return (
+      <button
+        type="button"
+        className={`${className} w-full cursor-pointer text-left`}
+        onClick={() => onItemClick(item)}
+      >
+        {content}
+      </button>
+    );
+  }
 
   if (item.href) {
     return (

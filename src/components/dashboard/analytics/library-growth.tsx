@@ -63,6 +63,9 @@ function GrowthLines({ months }: { months: LibraryGrowthMonth[] }) {
     1,
     ...months.flatMap((month) => [month.artists, month.albums, month.tracks]),
   );
+  const artistRatios = months.map((month) => month.artists / max);
+  const albumRatios = months.map((month) => month.albums / max);
+  const trackRatios = months.map((month) => month.tracks / max);
 
   return (
     <div className="grid gap-2">
@@ -72,26 +75,32 @@ function GrowthLines({ months }: { months: LibraryGrowthMonth[] }) {
       />
       <Legend
         items={[
-          { label: "Artists", className: "bg-primary" },
-          { label: "Albums", className: "bg-chart-3" },
+          { label: "Artists", className: "bg-chart-1" },
+          { label: "Albums", className: "bg-chart-2" },
           { label: "Tracks", className: "bg-chart-4" },
         ]}
       />
       <div className="flex h-20 items-end gap-1">
-        {months.map((month) => (
-          <div key={month.label} className="flex h-full flex-1 items-end gap-px">
+        {months.map((month, index) => (
+          <div key={month.label} className="relative flex h-full flex-1 items-end gap-px">
             <ChartBar
-              value={month.artists / max}
-              className="bg-primary"
+              value={artistRatios[index] ?? 0}
+              leftValue={artistRatios[index - 1]}
+              rightValue={artistRatios[index + 1]}
+              className="bg-chart-1"
               tooltip={`${month.label}: ${formatCompact(month.artists)} artists`}
             />
             <ChartBar
-              value={month.albums / max}
-              className="bg-chart-3"
+              value={albumRatios[index] ?? 0}
+              leftValue={albumRatios[index - 1]}
+              rightValue={albumRatios[index + 1]}
+              className="bg-chart-2"
               tooltip={`${month.label}: ${formatCompact(month.albums)} albums`}
             />
             <ChartBar
-              value={month.tracks / max}
+              value={trackRatios[index] ?? 0}
+              leftValue={trackRatios[index - 1]}
+              rightValue={trackRatios[index + 1]}
               className="bg-chart-4"
               tooltip={`${month.label}: ${formatCompact(month.tracks)} tracks`}
             />
@@ -109,6 +118,9 @@ function MonthlyNewBars({ months }: { months: LibraryGrowthMonth[] }) {
     1,
     ...months.map((month) => month.newArtists + month.newAlbums + month.newTracks),
   );
+  const ratios = months.map(
+    (month) => (month.newArtists + month.newAlbums + month.newTracks) / max,
+  );
 
   return (
     <div className="grid gap-2">
@@ -117,15 +129,18 @@ function MonthlyNewBars({ months }: { months: LibraryGrowthMonth[] }) {
         help="Artists, albums, and tracks first seen during that month."
       />
       <div className="flex h-14 items-end gap-1">
-        {months.map((month) => (
-          <ChartBar
-            key={month.label}
-            value={(month.newArtists + month.newAlbums + month.newTracks) / max}
-            className="bg-primary/70"
-            tooltip={`${month.label}: ${formatCompact(
-              month.newArtists + month.newAlbums + month.newTracks,
-            )} new artists, albums, and tracks`}
-          />
+        {months.map((month, index) => (
+          <div key={month.label} className="relative flex h-full flex-1 items-end">
+            <ChartBar
+              value={ratios[index] ?? 0}
+              leftValue={ratios[index - 1]}
+              rightValue={ratios[index + 1]}
+              className="bg-chart-2"
+              tooltip={`${month.label}: ${formatCompact(
+                month.newArtists + month.newAlbums + month.newTracks,
+              )} new artists, albums, and tracks`}
+            />
+          </div>
         ))}
       </div>
     </div>

@@ -6,10 +6,12 @@ import { formatTimeAgo } from "@/utils/format";
 
 import { useDashboardSnapshot } from "./dashboard-context";
 import { SectionTitle } from "./section-title";
+import { useItemDetail } from "./item-detail-context";
 import { VirtualList } from "./virtual-list";
 
 export function RecentPlays() {
-  const tracks = useDashboardSnapshot().recentTracks;
+  const snapshot = useDashboardSnapshot();
+  const tracks = snapshot.recentTracks;
 
   return (
     <div className="grid gap-5">
@@ -18,7 +20,7 @@ export function RecentPlays() {
         <VirtualList
           height="28rem"
           items={tracks}
-          renderItem={(track) => <RecentPlayRow track={track} />}
+          renderItem={(track) => <RecentPlayRow snapshot={snapshot} track={track} />}
         />
       ) : (
         <div className="py-10 text-center text-sm text-muted-foreground">No recent plays yet</div>
@@ -27,13 +29,31 @@ export function RecentPlays() {
   );
 }
 
-function RecentPlayRow({ track }: { track: CachedRecentTrack }) {
+function RecentPlayRow({
+  snapshot,
+  track,
+}: {
+  snapshot: ReturnType<typeof useDashboardSnapshot>;
+  track: CachedRecentTrack;
+}) {
+  const { openItemDetail } = useItemDetail();
   const imageUrl = getImageUrl(track.track.images);
 
   return (
-    <a
-      href={track.track.url}
-      className="flex min-w-0 items-center gap-3 rounded-sm px-2 py-2 transition-colors duration-150 hover:bg-accent/60"
+    <button
+      type="button"
+      className="flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-left transition-colors duration-150 hover:bg-accent/60"
+      onClick={() =>
+        openItemDetail({
+          kind: "track",
+          artistName: track.artistName,
+          imageUrl,
+          playCount: 1,
+          trackName: track.trackName,
+          username: snapshot.username,
+          usernameLower: snapshot.usernameLower,
+        })
+      }
     >
       {imageUrl ? (
         <img
@@ -56,6 +76,6 @@ function RecentPlayRow({ track }: { track: CachedRecentTrack }) {
       <span className="shrink-0 font-mono text-[11px] text-muted-foreground/60">
         {formatTimeAgo(track.playedAtTimestamp)}
       </span>
-    </a>
+    </button>
   );
 }

@@ -1,4 +1,5 @@
 import type { ListeningSessionStats, SessionBucket } from "@/lib/listening-analytics";
+import { chartOpacityFromCount } from "@/utils/chart-intensity";
 import { formatCompact, formatNumber, formatPercent } from "@/utils/format";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
@@ -55,11 +56,16 @@ function DurationBuckets({ buckets }: { buckets: SessionBucket[] }) {
           <span className="font-mono text-muted-foreground">{bucket.label}</span>
           <Tooltip>
             <TooltipTrigger
-              render={<div className="h-1.5 overflow-hidden rounded-sm bg-muted/60" tabIndex={0} />}
+              render={
+                <div className="h-1.5 overflow-hidden rounded-sm bg-chart-track" tabIndex={0} />
+              }
             >
               <div
-                className="h-full rounded-sm bg-primary"
-                style={{ width: `${(bucket.count / max) * 100}%` }}
+                className="h-full rounded-sm bg-chart-1 transition-opacity duration-200 hover:opacity-100"
+                style={{
+                  width: `${(bucket.count / max) * 100}%`,
+                  opacity: chartOpacityFromCount(bucket.count, max),
+                }}
               />
             </TooltipTrigger>
             <TooltipContent>

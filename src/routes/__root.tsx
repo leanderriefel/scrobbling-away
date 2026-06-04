@@ -1,22 +1,18 @@
-import type { QueryClient } from "@tanstack/react-query"
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
-import {
-  HeadContent,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-} from "@tanstack/react-router"
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
+import type { QueryClient } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "@/components/header"
-import { Toaster } from "@/components/ui/sonner"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import type { orpc } from "@/utils/orpc"
+import Header from "@/components/header";
+import { SiteFooter } from "@/components/site-footer";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import type { orpc } from "@/utils/orpc";
 
-import appCss from "@/index.css?url"
+import appCss from "@/index.css?url";
 export interface RouterAppContext {
-  orpc: typeof orpc
-  queryClient: QueryClient
+  orpc: typeof orpc;
+  queryClient: QueryClient;
 }
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
@@ -42,19 +38,22 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   }),
 
   component: RootDocument,
-})
+});
 
 function RootDocument() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark scrollbar-thin scroll-smooth font-sans min-h-svh">
       <head>
         <HeadContent />
       </head>
       <body>
         <TooltipProvider>
-          <div className="grid h-svh grid-rows-[auto_1fr]">
+          <div className="flex min-h-svh flex-col">
             <Header />
-            <Outlet />
+            <div className="flex flex-1 flex-col">
+              <Outlet />
+            </div>
+            <SiteFooter />
           </div>
           <Toaster richColors />
           <TanStackRouterDevtools position="bottom-left" />
@@ -63,5 +62,5 @@ function RootDocument() {
         <Scripts />
       </body>
     </html>
-  )
+  );
 }

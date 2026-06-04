@@ -12,7 +12,7 @@ export function AnalyticsPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="mb-10 grid min-w-0 break-inside-avoid content-start gap-5 border-t border-border/70 pt-5">
+    <div className="mb-10 grid min-w-0 break-inside-avoid content-start gap-5">
       <SectionTitle description={description}>{title}</SectionTitle>
       {children}
     </div>

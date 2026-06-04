@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   clearCachedStatsForUser,
   markAbandonedSyncStopped,
@@ -32,15 +33,16 @@ import {
 import { hydrateStatsSnapshotFromCache, syncLastFmStats } from "@/lib/lastfm-stats-sync";
 
 import { AnalyticsSection } from "./analytics-section";
+import { CompareWorkspace } from "./compare-workspace";
 import { DashboardProvider, useDashboardSnapshot } from "./dashboard-context";
 import { FriendsRow } from "./friends-row";
-import { ListeningClock } from "./listening-clock";
+import { ListeningRhythmPanel } from "./listening-rhythm-panel";
 import { Rankings } from "./rankings";
 import { RecentPlays } from "./recent-plays";
 import { SyncBar } from "./sync-bar";
+import { ItemDetailOverlay } from "./item-detail-page";
+import { ItemDetailProvider } from "./item-detail-context";
 import { UserHeader } from "./user-header";
-import { WeekdayChart } from "./weekday-chart";
-import { YearChart } from "./year-chart";
 
 const LAST_USERNAME_KEY = "scrobbling-away:lastfm-username";
 
@@ -162,93 +164,115 @@ export function StatsWorkspace() {
   };
 
   return (
-    <main className="overflow-y-auto">
+    <main>
       <div className="mx-auto flex w-full max-w-[960px] flex-col px-5 py-6">
-        {/* Search + sync */}
-        <section className="section-in grid gap-3">
-          <form className="flex gap-2" onSubmit={handleSubmit}>
-            <Input
-              className="flex-1"
-              placeholder="Last.fm username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            {isSyncing ? (
-              <Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>
-                <SquareIcon className="size-4" />
-                Stop
-              </Button>
-            ) : (
-              <Button type="submit" disabled={snapshotQuery.isLoading}>
-                {snapshotQuery.isLoading ? (
-                  <LoaderCircleIcon className="size-4 animate-spin" />
-                ) : (
-                  <DownloadIcon className="size-4" />
+        <ItemDetailProvider>
+          <Tabs defaultValue="stats">
+            <TabsList variant="line" className="mb-6">
+              <TabsTrigger value="stats">Your stats</TabsTrigger>
+              <TabsTrigger value="compare">Compare</TabsTrigger>
+            </TabsList>
+            <TabsContent value="stats" className="text-base/normal">
+              {/* Search + sync */}
+              <section className="animate-section-in motion-reduce:animate-none grid gap-3">
+                <form className="flex gap-2" onSubmit={handleSubmit}>
+                  <Input
+                    className="flex-1"
+                    placeholder="Last.fm username"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  {isSyncing ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => abortRef.current?.abort()}
+                    >
+                      <SquareIcon className="size-4" />
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button type="submit" disabled={snapshotQuery.isLoading}>
+                      {snapshotQuery.isLoading ? (
+                        <LoaderCircleIcon className="size-4 animate-spin" />
+                      ) : (
+                        <DownloadIcon className="size-4" />
+                      )}
+                      {canResumeSync ? "Resume" : hasCachedData ? "Sync again" : "Sync"}
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={<Button type="button" variant="outline" size="icon" />}
+                    >
+                      <MoreHorizontalIcon className="size-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>Cache</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => void handleRefreshCache()}>
+                          <RefreshCcwIcon className="size-4" />
+                          Reload from IndexedDB
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!selectedUsername && !username.trim()}
+                          onClick={() => void startSync(selectedUsername || username.trim())}
+                        >
+                          <DownloadIcon className="size-4" />
+                          Restart sync
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={!selectedUsername && !username.trim()}
+                        onClick={() => void handleClearCache()}
+                      >
+                        <Trash2Icon className="size-4" />
+                        Clear this user
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </form>
+                <SyncBar isLoading={isSyncing || snapshotQuery.isLoading} snapshot={snapshot} />
+                {snapshot && (
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <DatabaseIcon className="size-3 text-muted-foreground" />
+                    <span>{snapshot.counts.recentTracks.toLocaleString()} scrobbles</span>
+                    <span>
+                      {snapshot.counts.topArtists.overall.toLocaleString()} ranked artists
+                    </span>
+                    <span>{snapshot.counts.friends.toLocaleString()} friends</span>
+                  </div>
                 )}
-                {canResumeSync ? "Resume" : hasCachedData ? "Sync again" : "Sync"}
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" />}>
-                <MoreHorizontalIcon className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Cache</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => void handleRefreshCache()}>
-                    <RefreshCcwIcon className="size-4" />
-                    Reload from IndexedDB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!selectedUsername && !username.trim()}
-                    onClick={() => void startSync(selectedUsername || username.trim())}
-                  >
-                    <DownloadIcon className="size-4" />
-                    Restart sync
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  disabled={!selectedUsername && !username.trim()}
-                  onClick={() => void handleClearCache()}
+              </section>
+
+              {/* Loading state */}
+              {selectedUsername && !snapshot && (
+                <div className="animate-section-in motion-reduce:animate-none flex flex-col items-center py-20 text-center">
+                  <LoaderCircleIcon className="size-6 animate-spin text-muted-foreground" />
+                  <p className="mt-4 text-sm text-muted-foreground">Loading your music…</p>
+                </div>
+              )}
+
+              {/* Dashboard */}
+              {snapshot && (
+                <DashboardProvider
+                  snapshot={snapshot}
+                  selectedPeriod={selectedPeriod}
+                  setSelectedPeriod={setSelectedPeriod}
                 >
-                  <Trash2Icon className="size-4" />
-                  Clear this user
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </form>
-          <SyncBar isLoading={isSyncing || snapshotQuery.isLoading} snapshot={snapshot} />
-          {snapshot && (
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-              <DatabaseIcon className="size-3 text-primary/60" />
-              <span>{snapshot.counts.recentTracks.toLocaleString()} scrobbles</span>
-              <span>{snapshot.counts.topArtists.overall.toLocaleString()} ranked artists</span>
-              <span>{snapshot.counts.friends.toLocaleString()} friends</span>
-            </div>
-          )}
-        </section>
-
-        {/* Loading state */}
-        {selectedUsername && !snapshot && (
-          <div className="section-in flex flex-col items-center py-20 text-center">
-            <LoaderCircleIcon className="size-6 animate-spin text-primary/40" />
-            <p className="mt-4 text-sm text-muted-foreground">Loading your music…</p>
-          </div>
-        )}
-
-        {/* Dashboard */}
-        {snapshot && (
-          <DashboardProvider
-            snapshot={snapshot}
-            selectedPeriod={selectedPeriod}
-            setSelectedPeriod={setSelectedPeriod}
-          >
-            <Dashboard />
-          </DashboardProvider>
-        )}
+                  <Dashboard />
+                </DashboardProvider>
+              )}
+            </TabsContent>
+            <TabsContent value="compare" className="text-base/normal">
+              <CompareWorkspace />
+            </TabsContent>
+          </Tabs>
+          <ItemDetailOverlay />
+        </ItemDetailProvider>
       </div>
     </main>
   );
@@ -256,7 +280,10 @@ export function StatsWorkspace() {
 
 function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
-    <section className="section-in" style={{ animationDelay: `${delay}ms` } as CSSProperties}>
+    <section
+      className="animate-section-in motion-reduce:animate-none"
+      style={{ animationDelay: `${delay}ms` } as CSSProperties}
+    >
       {children}
     </section>
   );
@@ -264,44 +291,29 @@ function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; d
 
 function Dashboard() {
   return (
-    <>
-      <div className="divider-fade my-8" />
+    <div className="mt-8 grid gap-16 pb-12">
       <AnimatedSection delay={0}>
         <UserHeader />
       </AnimatedSection>
 
-      <div className="divider-fade my-8" />
       <AnimatedSection delay={60}>
-        <ListeningClock />
+        <ListeningRhythmPanel layout="dashboard" />
       </AnimatedSection>
 
-      <div className="divider-fade my-8" />
-      <AnimatedSection delay={120}>
-        <div className="grid gap-8 sm:grid-cols-2">
-          <YearChart />
-          <WeekdayChart />
-        </div>
-      </AnimatedSection>
-
-      <div className="divider-fade my-8" />
       <AnimatedSection delay={180}>
         <AnalyticsSection />
       </AnimatedSection>
 
-      <div className="divider-fade my-8" />
       <AnimatedSection delay={240}>
         <Rankings />
       </AnimatedSection>
 
-      <div className="divider-fade my-8" />
       <AnimatedSection delay={300}>
         <RecentPlays />
       </AnimatedSection>
 
       <FriendsSection />
-
-      <div className="h-12" />
-    </>
+    </div>
   );
 }
 
@@ -311,11 +323,8 @@ function FriendsSection() {
   if (snapshot.friends.length === 0) return null;
 
   return (
-    <>
-      <div className="divider-fade my-8" />
-      <AnimatedSection delay={360}>
-        <FriendsRow />
-      </AnimatedSection>
-    </>
+    <AnimatedSection delay={360}>
+      <FriendsRow />
+    </AnimatedSection>
   );
 }

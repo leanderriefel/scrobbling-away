@@ -1,148 +1,264 @@
-import type { TopAlbum, TopArtist, TopTrack } from "@/lib/lastfm";
-import {
-  LASTFM_PERIODS,
-  getImageUrl,
-  readLastFmString,
-  type LastFmPeriod,
-  type RankedStat,
-} from "@/lib/lastfm-stats-cache";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchIcon, XIcon } from "lucide-react";
+import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useDashboardPeriod, useDashboardSnapshot } from "./dashboard-context";
+import { PeriodSelect } from "./period-select";
+import {
+  getAlbumRankingItems,
+  getArtistRankingItems,
+  getTrackRankingItems,
+  type RankingKind,
+} from "./ranking-items";
 import { SectionTitle } from "./section-title";
+import { useItemDetail } from "./item-detail-context";
 import { TrackList, type TrackListItem } from "./track-list";
 
-const periodLabels: Record<LastFmPeriod, string> = {
-  "12month": "12 months",
-  "1month": "1 month",
-  "3month": "3 months",
-  "6month": "6 months",
-  "7day": "7 days",
-  overall: "All time",
+type SearchableRankingItem = {
+  item: TrackListItem;
+  searchText: string;
 };
 
-export function Rankings() {
-  const snapshot = useDashboardSnapshot();
-  const { selectedPeriod, setSelectedPeriod } = useDashboardPeriod();
-  const topArtists = snapshot.topArtists[selectedPeriod];
-  const topAlbums = snapshot.topAlbums[selectedPeriod];
-  const topTracks = snapshot.topTracks[selectedPeriod];
-  const historyArtists = snapshot.derived.topArtistsFromHistory;
-  const historyAlbums = snapshot.derived.topAlbumsFromHistory;
-  const historyTracks = snapshot.derived.topTracksFromHistory;
-  const periodSelector = (
-    <Select
-      value={selectedPeriod}
-      onValueChange={(value) => setSelectedPeriod(value as LastFmPeriod)}
-    >
-      <SelectTrigger size="sm">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {LASTFM_PERIODS.map((p) => (
-            <SelectItem key={p} value={p}>
-              {periodLabels[p]}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+const normalizeSearchText = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const toSearchableRankingItems = (items: TrackListItem[]): SearchableRankingItem[] =>
+  items.map((item) => ({
+    item,
+    searchText: normalizeSearchText(`${item.label} ${item.detail ?? ""}`),
+  }));
+
+const fuzzyScore = (text: string, query: string) => {
+  if (text.includes(query)) return query.length * 4;
+
+  let queryIndex = 0;
+  let score = 0;
+  let runLength = 0;
+
+  for (let textIndex = 0; textIndex < text.length && queryIndex < query.length; textIndex++) {
+    if (text[textIndex] !== query[queryIndex]) {
+      runLength = 0;
+      continue;
+    }
+
+    runLength += 1;
+    score += 1 + runLength * 2;
+
+    if (textIndex === 0 || text[textIndex - 1] === " ") {
+      score += 3;
+    }
+
+    queryIndex += 1;
+  }
+
+  return queryIndex === query.length ? score : 0;
+};
+
+const filterRankingItems = (searchableItems: SearchableRankingItem[], rawQuery: string) => {
+  const query = normalizeSearchText(rawQuery);
+
+  if (!query) return searchableItems.map(({ item }) => item);
+
+  const matches: { item: TrackListItem; score: number }[] = [];
+
+  for (const { item, searchText } of searchableItems) {
+    const score = fuzzyScore(searchText, query);
+
+    if (score > 0) {
+      matches.push({ item, score });
+    }
+  }
+
+  matches.sort(
+    (left, right) => right.score - left.score || (left.item.rank ?? 0) - (right.item.rank ?? 0),
   );
 
-  const artistItems =
-    topArtists.length > 0
-      ? topArtists.slice(0, 20).map((artist) => toArtistItem(artist, historyArtists))
-      : historyArtists.slice(0, 20).map(toRankedItem);
+  return matches.map(({ item }) => item);
+};
 
-  const albumItems =
-    topAlbums.length > 0
-      ? topAlbums.slice(0, 20).map(toAlbumItem)
-      : historyAlbums.slice(0, 20).map(toRankedItem);
+type RankingsProps = {
+  listHeight?: string;
+  showPeriodSelect?: boolean;
+  showTitle?: boolean;
+};
 
-  const trackItems =
-    topTracks.length > 0
-      ? topTracks.slice(0, 20).map((track) => toTrackItem(track, historyTracks))
-      : historyTracks.slice(0, 20).map(toRankedItem);
+export const Rankings = ({
+  listHeight = "28rem",
+  showPeriodSelect = true,
+  showTitle = true,
+}: RankingsProps = {}) => {
+  const { selectedPeriod, setSelectedPeriod } = useDashboardPeriod();
 
   return (
     <div className="grid gap-5">
-      <SectionTitle
-        action={periodSelector}
-        description="Ranked artists, albums, and tracks for the selected Last.fm period."
-      >
-        Most played
-      </SectionTitle>
+      {showTitle && (
+        <SectionTitle
+          action={
+            showPeriodSelect ? (
+              <PeriodSelect value={selectedPeriod} onValueChange={setSelectedPeriod} />
+            ) : undefined
+          }
+          description="Ranked artists, albums, and tracks for the selected Last.fm period."
+        >
+          Most played
+        </SectionTitle>
+      )}
       <Tabs defaultValue="artists">
-        <TabsList variant="line">
-          <TabsTrigger value="artists">Artists</TabsTrigger>
-          <TabsTrigger value="albums">Albums</TabsTrigger>
-          <TabsTrigger value="tracks">Tracks</TabsTrigger>
-        </TabsList>
-        <TabsContent value="artists">
-          <TrackList items={artistItems} emptyMessage="No artist data yet" height="28rem" />
-        </TabsContent>
-        <TabsContent value="albums">
-          <TrackList items={albumItems} emptyMessage="No album data yet" height="28rem" />
-        </TabsContent>
-        <TabsContent value="tracks">
-          <TrackList items={trackItems} emptyMessage="No track data yet" height="28rem" />
-        </TabsContent>
+        <RankingsTabList />
+        <RankingsTabPanels listHeight={listHeight} />
       </Tabs>
     </div>
   );
-}
+};
 
-const toArtistItem = (artist: TopArtist, fallbackItems: RankedStat[]): TrackListItem => ({
-  id: `${artist.rank}-${artist.name}`,
-  rank: artist.rank,
-  label: artist.name,
-  count: artist.playcount,
-  imageUrl: getImageUrl(artist.images) ?? findFallbackImage(fallbackItems, artistKey(artist.name)),
-  href: artist.url,
-});
+export const RankingsTabList = () => (
+  <TabsList variant="line">
+    <TabsTrigger value="artists">Artists</TabsTrigger>
+    <TabsTrigger value="albums">Albums</TabsTrigger>
+    <TabsTrigger value="tracks">Tracks</TabsTrigger>
+  </TabsList>
+);
 
-const toAlbumItem = (album: TopAlbum): TrackListItem => ({
-  id: `${album.rank}-${readLastFmString(album.artist.name)}-${album.name}`,
-  rank: album.rank,
-  label: album.name,
-  detail: readLastFmString(album.artist.name),
-  count: album.playcount,
-  imageUrl: getImageUrl(album.images),
-  href: album.url,
-});
+export const RankingsTabPanels = ({
+  listHeight = "28rem",
+  renderPanel,
+}: {
+  listHeight?: string;
+  renderPanel?: (kind: RankingKind) => ReactNode;
+}) => (
+  <>
+    <TabsContent value="artists">
+      {renderPanel ? (
+        renderPanel("artists")
+      ) : (
+        <RankingsTrackList kind="artists" listHeight={listHeight} />
+      )}
+    </TabsContent>
+    <TabsContent value="albums">
+      {renderPanel ? (
+        renderPanel("albums")
+      ) : (
+        <RankingsTrackList kind="albums" listHeight={listHeight} />
+      )}
+    </TabsContent>
+    <TabsContent value="tracks">
+      {renderPanel ? (
+        renderPanel("tracks")
+      ) : (
+        <RankingsTrackList kind="tracks" listHeight={listHeight} />
+      )}
+    </TabsContent>
+  </>
+);
 
-const toTrackItem = (track: TopTrack, fallbackItems: RankedStat[]): TrackListItem => ({
-  id: `${track.rank}-${readLastFmString(track.artist.name)}-${track.name}`,
-  rank: track.rank,
-  label: track.name,
-  detail: readLastFmString(track.artist.name),
-  count: track.playcount,
-  imageUrl:
-    getImageUrl(track.images) ??
-    findFallbackImage(fallbackItems, trackKey(readLastFmString(track.artist.name), track.name)),
-  href: track.url,
-});
+export const RankingsTrackList = ({
+  header,
+  kind,
+  listHeight = "28rem",
+}: {
+  header?: ReactNode;
+  kind: RankingKind;
+  listHeight?: string;
+}) => {
+  const snapshot = useDashboardSnapshot();
+  const { selectedPeriod } = useDashboardPeriod();
+  const { openItemDetail } = useItemDetail();
+  const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const items = useMemo(
+    () =>
+      kind === "artists"
+        ? getArtistRankingItems(snapshot, selectedPeriod)
+        : kind === "albums"
+          ? getAlbumRankingItems(snapshot, selectedPeriod)
+          : getTrackRankingItems(snapshot, selectedPeriod),
+    [kind, selectedPeriod, snapshot],
+  );
+  const searchableItems = useMemo(() => toSearchableRankingItems(items), [items]);
+  const filteredItems = useMemo(
+    () => filterRankingItems(searchableItems, deferredSearchQuery),
+    [deferredSearchQuery, searchableItems],
+  );
+  const isFiltering = searchQuery !== deferredSearchQuery;
+  const searchLabel =
+    kind === "artists"
+      ? "Search artists"
+      : kind === "albums"
+        ? "Search albums or artists"
+        : "Search tracks or artists";
 
-const toRankedItem = (item: RankedStat, index: number): TrackListItem => ({
-  ...item,
-  rank: index + 1,
-});
+  const handleItemClick = (item: TrackListItem) => {
+    const base = {
+      imageUrl: item.imageUrl,
+      playCount: item.count,
+      username: snapshot.username,
+      usernameLower: snapshot.usernameLower,
+    };
 
-const findFallbackImage = (items: RankedStat[], key: string) =>
-  items.find((item) => item.id === key)?.imageUrl;
+    if (kind === "artists") {
+      openItemDetail({ kind: "artist", artistName: item.label, ...base });
+      return;
+    }
 
-const normalizeKeyPart = (value: string | undefined) => value?.trim().toLocaleLowerCase() ?? "";
+    if (kind === "albums") {
+      openItemDetail({
+        kind: "album",
+        albumName: item.label,
+        artistName: item.detail ?? "Unknown artist",
+        ...base,
+      });
+      return;
+    }
 
-const artistKey = (artistName: string) => normalizeKeyPart(artistName);
+    openItemDetail({
+      kind: "track",
+      trackName: item.label,
+      artistName: item.detail ?? "Unknown artist",
+      ...base,
+    });
+  };
 
-const trackKey = (artistName: string, trackName: string) =>
-  `${artistKey(artistName)}:${normalizeKeyPart(trackName)}`;
+  return (
+    <div className="grid min-w-0 content-start gap-4">
+      {header}
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
+        <Input
+          aria-label={searchLabel}
+          className="pr-8 pl-8"
+          placeholder={searchLabel}
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+        {searchQuery ? (
+          <Button
+            aria-label="Clear search"
+            className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={() => setSearchQuery("")}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        ) : null}
+      </div>
+      <div className={isFiltering ? "opacity-70 transition-opacity" : "transition-opacity"}>
+        <TrackList
+          key={`${selectedPeriod}-${kind}-${deferredSearchQuery}`}
+          items={filteredItems}
+          emptyMessage={searchQuery ? `No ${kind} match "${searchQuery}"` : `No ${kind} yet`}
+          height={listHeight}
+          onItemClick={handleItemClick}
+        />
+      </div>
+    </div>
+  );
+};

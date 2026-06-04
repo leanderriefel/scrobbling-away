@@ -5,6 +5,7 @@ export type ListeningSignature = {
   averagePerDay: string;
   peakHour: string;
   peakWeekday: string;
+  peakMonth: string;
   peakYear: string;
   repeatRate: number;
 };
@@ -22,6 +23,7 @@ export const getListeningSignature = (snapshot: LastFmStatsSnapshot): ListeningS
     averagePerDay,
     peakHour: formatPeak(snapshot.derived.scrobblesByHour, (label) => `${label}:00`),
     peakWeekday: formatPeak(snapshot.derived.scrobblesByWeekday),
+    peakMonth: formatPeak(snapshot.derived.scrobblesByMonthOfYear),
     peakYear: formatPeak(snapshot.derived.scrobblesByYear),
     repeatRate,
   };

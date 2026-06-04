@@ -1,0 +1,3 @@
+{
+  "extends": "@last.fm/config/tsconfig.base.json"
+}

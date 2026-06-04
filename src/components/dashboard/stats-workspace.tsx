@@ -231,19 +231,6 @@ export function StatsWorkspace() {
           )}
         </section>
 
-        {/* Welcome state */}
-        {!selectedUsername && (
-          <div className="section-in flex flex-col items-center py-24 text-center">
-            <h1 className="text-hero text-4xl font-bold tracking-tight sm:text-5xl">
-              Your music, visualized
-            </h1>
-            <p className="mt-3 max-w-md text-pretty text-muted-foreground">
-              Enter your Last.fm username to explore your listening history and discover patterns in
-              your taste.
-            </p>
-          </div>
-        )}
-
         {/* Loading state */}
         {selectedUsername && !snapshot && (
           <div className="section-in flex flex-col items-center py-20 text-center">

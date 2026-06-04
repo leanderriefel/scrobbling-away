@@ -145,7 +145,7 @@ export function StatsWorkspace() {
 
     await markAbandonedSyncStopped(nextUsername);
     await hydrateStatsSnapshotFromCache(nextUsername);
-    toast.success("Loaded cached data.");
+    toast.success("Stats reloaded.");
   };
 
   const handleClearCache = async () => {
@@ -160,7 +160,7 @@ export function StatsWorkspace() {
     await clearCachedStatsForUser(nextUsername);
     window.localStorage.removeItem(LAST_USERNAME_KEY);
     setSelectedUsername("");
-    toast.success("Cache cleared.");
+    toast.success("Stats cleared.");
   };
 
   return (
@@ -210,7 +210,7 @@ export function StatsWorkspace() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuGroup>
-                        <DropdownMenuLabel>Cache</DropdownMenuLabel>
+                        <DropdownMenuLabel>Local data</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => void handleRefreshCache()}>
                           <RefreshCcwIcon className="size-4" />
                           Reload from IndexedDB

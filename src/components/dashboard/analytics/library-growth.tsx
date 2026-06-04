@@ -50,8 +50,8 @@ export function LibraryGrowth({ analytics }: { analytics: LibraryGrowthStats }) 
           help="New artists, albums, and tracks first seen in the last 365 days."
         />
       </div>
-      <GrowthLines months={analytics.months.slice(-18)} />
-      <MonthlyNewBars months={analytics.months.slice(-12)} />
+      <GrowthLines months={analytics.months} />
+      <MonthlyNewBars months={analytics.months} />
     </AnalyticsPanel>
   );
 }
@@ -80,32 +80,37 @@ function GrowthLines({ months }: { months: LibraryGrowthMonth[] }) {
           { label: "Tracks", className: "bg-chart-4" },
         ]}
       />
-      <div className="flex h-20 items-end gap-1">
-        {months.map((month, index) => (
-          <div key={month.label} className="relative flex h-full flex-1 items-end gap-px">
-            <ChartBar
-              value={artistRatios[index] ?? 0}
-              leftValue={artistRatios[index - 1]}
-              rightValue={artistRatios[index + 1]}
-              className="bg-chart-1"
-              tooltip={`${month.label}: ${formatCompact(month.artists)} artists`}
-            />
-            <ChartBar
-              value={albumRatios[index] ?? 0}
-              leftValue={albumRatios[index - 1]}
-              rightValue={albumRatios[index + 1]}
-              className="bg-chart-2"
-              tooltip={`${month.label}: ${formatCompact(month.albums)} albums`}
-            />
-            <ChartBar
-              value={trackRatios[index] ?? 0}
-              leftValue={trackRatios[index - 1]}
-              rightValue={trackRatios[index + 1]}
-              className="bg-chart-4"
-              tooltip={`${month.label}: ${formatCompact(month.tracks)} tracks`}
-            />
-          </div>
-        ))}
+      <div className="overflow-x-auto scrollbar-thin">
+        <div
+          className="flex h-20 items-end gap-1"
+          style={{ minWidth: `${Math.max(months.length * 10, 100)}%` }}
+        >
+          {months.map((month, index) => (
+            <div key={month.label} className="relative flex h-full min-w-2 flex-1 items-end gap-px">
+              <ChartBar
+                value={artistRatios[index] ?? 0}
+                leftValue={artistRatios[index - 1]}
+                rightValue={artistRatios[index + 1]}
+                className="bg-chart-1"
+                tooltip={`${month.label}: ${formatCompact(month.artists)} artists`}
+              />
+              <ChartBar
+                value={albumRatios[index] ?? 0}
+                leftValue={albumRatios[index - 1]}
+                rightValue={albumRatios[index + 1]}
+                className="bg-chart-2"
+                tooltip={`${month.label}: ${formatCompact(month.albums)} albums`}
+              />
+              <ChartBar
+                value={trackRatios[index] ?? 0}
+                leftValue={trackRatios[index - 1]}
+                rightValue={trackRatios[index + 1]}
+                className="bg-chart-4"
+                tooltip={`${month.label}: ${formatCompact(month.tracks)} tracks`}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -128,20 +133,25 @@ function MonthlyNewBars({ months }: { months: LibraryGrowthMonth[] }) {
         label="New this month"
         help="Artists, albums, and tracks first seen during that month."
       />
-      <div className="flex h-14 items-end gap-1">
-        {months.map((month, index) => (
-          <div key={month.label} className="relative flex h-full flex-1 items-end">
-            <ChartBar
-              value={ratios[index] ?? 0}
-              leftValue={ratios[index - 1]}
-              rightValue={ratios[index + 1]}
-              className="bg-chart-2"
-              tooltip={`${month.label}: ${formatCompact(
-                month.newArtists + month.newAlbums + month.newTracks,
-              )} new artists, albums, and tracks`}
-            />
-          </div>
-        ))}
+      <div className="overflow-x-auto scrollbar-thin">
+        <div
+          className="flex h-14 items-end gap-1"
+          style={{ minWidth: `${Math.max(months.length * 10, 100)}%` }}
+        >
+          {months.map((month, index) => (
+            <div key={month.label} className="relative flex h-full min-w-2 flex-1 items-end">
+              <ChartBar
+                value={ratios[index] ?? 0}
+                leftValue={ratios[index - 1]}
+                rightValue={ratios[index + 1]}
+                className="bg-chart-2"
+                tooltip={`${month.label}: ${formatCompact(
+                  month.newArtists + month.newAlbums + month.newTracks,
+                )} new artists, albums, and tracks`}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -35,7 +35,7 @@ export const CompareDashboard = ({
     </section>
 
     <section className="animate-section-in motion-reduce:animate-none grid gap-8">
-      <SectionTitle description="Listening rhythm from cached scrobble history.">
+      <SectionTitle description="Listening rhythm from scrobble history.">
         Listening shape
       </SectionTitle>
       <CompareColumns

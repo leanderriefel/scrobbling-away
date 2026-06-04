@@ -33,9 +33,9 @@ export const SiteFooter = () => {
                   to Last.fm, not through our servers.
                 </p>
                 <p>
-                  We do not store your listening data on a backend. Cached stats live in your
-                  browser (IndexedDB) so you can reload them locally. We do not collect personal
-                  data beyond what Last.fm already shows publicly for a username.
+                  We do not store your listening data on a backend. Stats are saved in your browser
+                  (IndexedDB) so you can reload them locally. We do not collect personal data beyond
+                  what Last.fm already shows publicly for a username.
                 </p>
                 <p>
                   Hosting may keep standard request logs (for example IP address, timestamp, and

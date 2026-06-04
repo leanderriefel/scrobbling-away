@@ -18,7 +18,7 @@ export const CompareColumnLabel = () => {
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold">{displayName}</div>
         <div className="truncate text-[11px] text-muted-foreground">
-          {formatCompact(snapshot.counts.recentTracks)} cached scrobbles
+          {formatCompact(snapshot.counts.recentTracks)} scrobbles
         </div>
       </div>
     </div>

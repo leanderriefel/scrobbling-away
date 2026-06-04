@@ -144,7 +144,7 @@ export const CompareWorkspace = () => {
           await hydrateStatsSnapshotFromCache(username);
           hydratedUserIdsRef.current.add(id);
         } catch {
-          toast.error(`Could not load cached data for @${username}.`);
+          toast.error(`Could not load stats for @${username}.`);
         } finally {
           hydratingUserIdsRef.current.delete(id);
           setHydratingUserIds((current) => {
@@ -329,9 +329,7 @@ export const CompareWorkspace = () => {
                 }
               />
               <span>
-                {hydratingUsernames.length > 0
-                  ? "Checking cached data for "
-                  : "No cached data yet for "}
+                {hydratingUsernames.length > 0 ? "Loading stats for " : "No stats yet for "}
                 {pendingUsernames.map((name) => `@${name}`).join(", ")}
                 {hydratingUsernames.length > 0 ? "…" : ". Use Sync all to fetch."}
               </span>
@@ -358,7 +356,7 @@ export const CompareWorkspace = () => {
           <div className="animate-section-in motion-reduce:animate-none flex flex-col items-center py-16 text-center">
             <UsersIcon className="size-6 text-muted-foreground" />
             <p className="mt-4 text-sm text-muted-foreground">
-              Waiting for cached data. Run Sync all or sync each user from Your stats first.
+              Waiting for stats. Run Sync all or sync each user from Your stats first.
             </p>
           </div>
         )}

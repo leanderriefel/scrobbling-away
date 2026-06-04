@@ -43,7 +43,7 @@ export function DiscoveryReplay({ analytics }: { analytics: DiscoveryReplayStats
           { label: "Heavy", className: "bg-chart-4" },
         ]}
       />
-      <StackedReplayBars months={analytics.months.slice(-12)} />
+      <StackedReplayBars months={analytics.months} />
     </AnalyticsPanel>
   );
 }
@@ -54,43 +54,49 @@ function StackedReplayBars({ months }: { months: DiscoveryReplayMonth[] }) {
   const maxTotal = Math.max(1, ...months.map((month) => month.total));
 
   return (
-    <div className="flex h-24 items-end gap-1">
-      {months.map((month) => (
-        <Tooltip key={month.label}>
-          <TooltipTrigger
-            render={
+    <div className="overflow-x-auto scrollbar-thin">
+      <div
+        className="flex h-24 items-end gap-1"
+        style={{ minWidth: `${Math.max(months.length * 10, 100)}%` }}
+      >
+        {months.map((month) => (
+          <Tooltip key={month.label}>
+            <TooltipTrigger
+              render={
+                <div
+                  className="flex h-full min-w-2 flex-1 flex-col justify-end overflow-hidden rounded-sm bg-chart-track outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100 focus-visible:ring-2"
+                  style={{ opacity: chartOpacityFromCount(month.total, maxTotal) }}
+                  tabIndex={0}
+                />
+              }
+            >
               <div
-                className="flex h-full flex-1 flex-col justify-end overflow-hidden rounded-sm bg-chart-track outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100 focus-visible:ring-2"
-                style={{ opacity: chartOpacityFromCount(month.total, maxTotal) }}
-                tabIndex={0}
+                className="bg-chart-4"
+                style={{
+                  height: `${month.total > 0 ? (month.heavyRepeatPlays / month.total) * 100 : 0}%`,
+                }}
               />
-            }
-          >
-            <div
-              className="bg-chart-4"
-              style={{
-                height: `${month.total > 0 ? (month.heavyRepeatPlays / month.total) * 100 : 0}%`,
-              }}
-            />
-            <div
-              className="bg-chart-2"
-              style={{
-                height: `${month.total > 0 ? (month.repeatPlays / month.total) * 100 : 0}%`,
-              }}
-            />
-            <div
-              className="bg-chart-1"
-              style={{
-                height: `${month.total > 0 ? (month.newPlays / month.total) * 100 : 0}%`,
-              }}
-            />
-          </TooltipTrigger>
-          <TooltipContent>
-            {month.label}: {formatCompact(month.newPlays)} new · {formatCompact(month.repeatPlays)}{" "}
-            repeat · {formatCompact(month.heavyRepeatPlays)} heavy
-          </TooltipContent>
-        </Tooltip>
-      ))}
+              <div
+                className="bg-chart-2"
+                style={{
+                  height: `${month.total > 0 ? (month.repeatPlays / month.total) * 100 : 0}%`,
+                }}
+              />
+              <div
+                className="bg-chart-1"
+                style={{
+                  height: `${month.total > 0 ? (month.newPlays / month.total) * 100 : 0}%`,
+                }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              {month.label}: {formatCompact(month.newPlays)} new ·{" "}
+              {formatCompact(month.repeatPlays)} repeat · {formatCompact(month.heavyRepeatPlays)}{" "}
+              heavy
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
     </div>
   );
 }

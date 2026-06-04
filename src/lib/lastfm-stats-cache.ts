@@ -485,7 +485,7 @@ export const markAbandonedSyncStopped = async (username: string) => {
   const stoppedSync: LastFmSyncMeta = {
     ...sync,
     status: "stopped",
-    message: "Previous sync was interrupted. Cached data is still available.",
+    message: "Previous sync was interrupted. Your synced data is still available.",
     updatedAt: new Date().toISOString(),
   };
 

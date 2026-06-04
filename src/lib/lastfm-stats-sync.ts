@@ -91,7 +91,7 @@ export const syncLastFmStats = async (
       usernameLower,
       status: "running",
       phase: "idle",
-      message: "Preparing cache",
+      message: "Preparing sync",
       fetched: 0,
       updatedAt: new Date().toISOString(),
     },
@@ -142,7 +142,7 @@ export const syncLastFmStats = async (
     await emitProgress(context, {
       status: "complete",
       phase: "complete",
-      message: "Full cache is up to date",
+      message: "Already up to date",
       fetched: 1,
       total: 1,
       completedAt: new Date().toISOString(),
@@ -157,7 +157,7 @@ export const syncLastFmStats = async (
     if (isAbortError(error)) {
       await emitProgress(context, {
         status: "stopped",
-        message: "Sync stopped. Cached data is still available.",
+        message: "Sync stopped. Your synced data is still available.",
       });
       return await publishSnapshot(context, onSnapshot);
     }
@@ -192,7 +192,7 @@ const syncProfile = async (context: SyncContext) => {
   await emitProgress(context, {
     fetched: 1,
     total: 1,
-    message: "Profile cached",
+    message: "Profile saved",
   });
 
   return profile;
@@ -227,7 +227,7 @@ const syncFriends = async (context: SyncContext) => {
     friends.map((friend) => createCachedFriend(context.usernameLower, friend, fetchedAt)),
   );
   await emitProgress(context, {
-    message: `${friends.length.toLocaleString()} friends cached`,
+    message: `${friends.length.toLocaleString()} friends saved`,
     fetched: friends.length,
     total: friends.length,
   });
@@ -337,7 +337,7 @@ const syncTopPeriod = async <TItem>(
 
   await replaceCache(items, fetchedAt);
   await emitProgress(context, {
-    message: `${items.length.toLocaleString()} ${phaseLabel(phase)} cached for ${periodLabels[period]}`,
+    message: `${items.length.toLocaleString()} ${phaseLabel(phase)} saved for ${periodLabels[period]}`,
     fetched: items.length,
     total: items.length,
   });
@@ -359,7 +359,7 @@ const syncRecentTrackHistory = async (context: SyncContext, profile: UserInfo) =
     phase: "recent-tracks",
     message:
       cacheState.count > 0
-        ? `Continuing from ${cacheState.count.toLocaleString()} cached scrobbles`
+        ? `Continuing from ${cacheState.count.toLocaleString()} scrobbles`
         : "Walking full scrobble history",
     fetched: cacheState.count,
     total: playcount,
@@ -370,7 +370,7 @@ const syncRecentTrackHistory = async (context: SyncContext, profile: UserInfo) =
   }
 
   await emitProgress(context, {
-    message: `${saved.count.toLocaleString()} scrobbles cached`,
+    message: `${saved.count.toLocaleString()} scrobbles saved`,
     fetched: saved.count,
     total: playcount,
   });
@@ -437,7 +437,7 @@ const syncRecentRange = async (
     );
     await emitProgress(context, {
       phase: "recent-tracks",
-      message: `Cached ${saved.count.toLocaleString()} scrobbles`,
+      message: `${saved.count.toLocaleString()} scrobbles saved`,
       fetched: saved.count,
       total: context.current.total,
     });

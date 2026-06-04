@@ -1,23 +1,24 @@
 import { Disc3Icon, LoaderCircleIcon, Mic2Icon, Music2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { ChartBar } from "@/components/dashboard/analytics/chart-bar";
 import {
   deriveScrobbleStats,
+  getAccountTimelineStart,
   getItemScrobbles,
   type ScrobbleStats,
 } from "@/lib/item-scrobble-stats";
-import { formatCompact, formatDateTime, formatNumber } from "@/utils/format";
+import { formatCompact, formatDateTime } from "@/utils/format";
 
 import {
-  getItemDetailKindLabel,
   getItemDetailTitle,
   toItemDetailFilter,
   useItemDetail,
   type ItemDetailSelection,
 } from "./item-detail-context";
 import { ListeningClock } from "./listening-clock";
+import { HelpTooltip } from "./help-tooltip";
 import { MonthChart } from "./month-chart";
+import { PlayHistoryAreaChart } from "./play-history-area-chart";
 import { SubpageShell } from "./subpage-shell";
 import { WeekdayChart } from "./weekday-chart";
 import { YearChart } from "./year-chart";
@@ -48,14 +49,14 @@ const ItemDetailContent = ({ selection }: { selection: ItemDetailSelection }) =>
 
     void (async () => {
       try {
-        const scrobbles = await getItemScrobbles(
-          selection.usernameLower,
-          toItemDetailFilter(selection),
-        );
+        const [scrobbles, timelineStart] = await Promise.all([
+          getItemScrobbles(selection.usernameLower, toItemDetailFilter(selection)),
+          getAccountTimelineStart(selection.usernameLower),
+        ]);
 
         if (cancelled) return;
 
-        setStats(deriveScrobbleStats(scrobbles, selection.kind));
+        setStats(deriveScrobbleStats(scrobbles, selection.kind, timelineStart));
       } catch {
         if (cancelled) return;
 
@@ -95,7 +96,7 @@ const ItemDetailContent = ({ selection }: { selection: ItemDetailSelection }) =>
     <div className="mx-auto grid max-w-3xl gap-8">
       <ItemDetailHeader playCount={playCount} selection={selection} stats={stats} />
 
-      <PlayHistoryChart buckets={stats.playHistory} />
+      <PlayHistoryAreaChart points={stats.playHistoryTimeline} />
 
       <ListeningClock buckets={stats.scrobblesByHour} />
 
@@ -135,9 +136,7 @@ const ItemDetailHeader = ({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            @{selection.username} · {getItemDetailKindLabel(selection.kind)}
-          </p>
+          <p className="text-xs text-muted-foreground">@{selection.username}</p>
           <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight">{title}</h1>
           {subtitle ? (
             <p className="mt-1 truncate text-sm text-muted-foreground">{subtitle}</p>
@@ -162,7 +161,7 @@ const ItemDetailHeader = ({
         <StatCard
           label="Months active"
           value={formatCompact(stats.playHistory.length)}
-          help="Months with at least one play in cached history"
+          help="Months with at least one play for this item."
         />
         {stats.uniqueTracks !== undefined ? (
           <StatCard label="Unique tracks" value={formatCompact(stats.uniqueTracks)} />
@@ -200,59 +199,10 @@ const getHeaderMeta = (selection: ItemDetailSelection) => {
 
 const StatCard = ({ help, label, value }: { help?: string; label: string; value: string }) => (
   <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-    <div className="text-[11px] text-muted-foreground">{label}</div>
-    <div className="mt-1 font-mono text-sm font-semibold tabular-nums">{value}</div>
-    {help ? (
-      <div className="mt-1 text-[10px] leading-snug text-muted-foreground/80">{help}</div>
-    ) : null}
-  </div>
-);
-
-const PlayHistoryChart = ({ buckets }: { buckets: ScrobbleStats["playHistory"] }) => {
-  if (buckets.length === 0) {
-    return (
-      <div className="grid gap-3">
-        <PlayHistoryTitle />
-        <div className="py-8 text-center text-sm text-muted-foreground">No play history yet</div>
-      </div>
-    );
-  }
-
-  const visibleBuckets = buckets.slice(-24);
-  const max = Math.max(1, ...visibleBuckets.map((bucket) => bucket.count));
-  const ratios = visibleBuckets.map((bucket) => bucket.count / max);
-
-  return (
-    <div className="grid gap-4">
-      <PlayHistoryTitle />
-      <div className="flex h-32 items-end gap-1">
-        {visibleBuckets.map((bucket, index) => (
-          <div key={`${bucket.label}-${index}`} className="relative flex h-full flex-1 items-end">
-            <ChartBar
-              value={ratios[index] ?? 0}
-              leftValue={ratios[index - 1]}
-              rightValue={ratios[index + 1]}
-              minHeightPercent={6}
-              className="animate-bar-grow origin-bottom motion-reduce:animate-none bg-chart-1"
-              animationDelayMs={index * 30}
-              tooltip={`${bucket.label} · ${formatNumber(bucket.count)} plays`}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-between font-mono text-[11px] text-muted-foreground/60">
-        <span>{visibleBuckets[0]?.label}</span>
-        <span>{visibleBuckets.at(-1)?.label}</span>
-      </div>
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span>{label}</span>
+      {help ? <HelpTooltip>{help}</HelpTooltip> : null}
     </div>
-  );
-};
-
-const PlayHistoryTitle = () => (
-  <div className="grid gap-1">
-    <h3 className="text-sm font-medium">Play history</h3>
-    <p className="text-xs text-muted-foreground">
-      Plays per month from your cached scrobble history.
-    </p>
+    <div className="mt-1 font-mono text-sm font-semibold tabular-nums">{value}</div>
   </div>
 );

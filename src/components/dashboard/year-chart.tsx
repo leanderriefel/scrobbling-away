@@ -39,7 +39,9 @@ export const YearChart = ({
 
     return (
       <div className="grid gap-5">
-        <SectionTitle description="Scrobbles grouped by calendar year.">By year</SectionTitle>
+        <SectionTitle description="Scrobbles grouped by calendar year from account creation through today.">
+          By year
+        </SectionTitle>
         <EmptyState message="No yearly data yet" />
       </div>
     );
@@ -77,7 +79,9 @@ export const YearChart = ({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <SectionTitle description="Scrobbles grouped by calendar year.">By year</SectionTitle>
+      <SectionTitle description="Scrobbles grouped by calendar year from account creation through today.">
+        By year
+      </SectionTitle>
       {chart}
     </div>
   );

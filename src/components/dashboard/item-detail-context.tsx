@@ -1,7 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import type { ItemDetailKind } from "@/lib/item-scrobble-stats";
-
 type ItemDetailBase = {
   imageUrl?: string;
   playCount?: number;
@@ -78,17 +76,6 @@ export const getItemDetailTitle = (selection: ItemDetailSelection) => {
       return selection.albumName;
     case "track":
       return selection.trackName;
-  }
-};
-
-export const getItemDetailKindLabel = (kind: ItemDetailKind) => {
-  switch (kind) {
-    case "artist":
-      return "Artist";
-    case "album":
-      return "Album";
-    case "track":
-      return "Track";
   }
 };
 

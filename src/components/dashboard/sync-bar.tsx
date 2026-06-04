@@ -40,7 +40,7 @@ export function SyncBar({
         : status === "stopped"
           ? (sync?.message ?? "Sync stopped")
           : snapshot
-            ? `Cache loaded ${formatRelativeTime(snapshot.updatedAt)}`
+            ? `Loaded ${formatRelativeTime(snapshot.updatedAt)}`
             : null;
 
   if (!label) return null;

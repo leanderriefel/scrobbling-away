@@ -1,6 +1,7 @@
 import type { TopAlbum, TopArtist, TopTrack, UserInfo } from "@/lib/lastfm";
 import { deriveListeningAnalytics } from "@/lib/listening-analytics";
 import { MONTH_LABELS } from "@/utils/calendar-labels";
+import { fillYearlyBuckets, resolveTimelineStart } from "@/utils/account-timeline";
 import type {
   CachedRecentTrack,
   LastFmDerivedStats,
@@ -101,9 +102,15 @@ export const deriveLastFmStats = ({
   }
 
   const profilePlaycount = profile?.playcount ?? 0;
+  const timelineStart = resolveTimelineStart(
+    profile?.registered?.timestamp,
+    firstScrobble?.playedAtTimestamp,
+  );
 
   return {
-    analytics: deriveListeningAnalytics(recentTracks as CachedRecentTrack[], periodLists),
+    analytics: deriveListeningAnalytics(recentTracks as CachedRecentTrack[], periodLists, {
+      registeredAt: profile?.registered?.timestamp,
+    }),
     firstScrobble,
     lastScrobble,
     lovedTracks,
@@ -122,9 +129,11 @@ export const deriveLastFmStats = ({
       label,
       count: monthsOfYear.get(index) ?? 0,
     })),
-    scrobblesByYear: [...years.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([label, count]) => ({ label, count })),
+    scrobblesByYear: timelineStart
+      ? fillYearlyBuckets(years, timelineStart)
+      : [...years.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([label, count]) => ({ label, count })),
   };
 };
 

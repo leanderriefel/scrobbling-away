@@ -59,7 +59,7 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
         <StatBlock
           label="Per day"
           value={signature.averagePerDay}
-          help="Average scrobbles per day since the first stored scrobble."
+          help="Average scrobbles per day since account creation."
           showHelp={!isCompare}
         />
         <StatBlock

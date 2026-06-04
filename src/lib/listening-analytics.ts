@@ -1,5 +1,11 @@
 import type { TopAlbum, TopArtist, TopTrack } from "@/lib/lastfm";
 import type { CachedRecentTrack, LastFmPeriod, RankedStat } from "@/lib/lastfm-stats-cache";
+import {
+  formatMonthKeyAnalytics,
+  monthKeyFromTimestamp,
+  monthRangeKeys,
+  resolveTimelineStart,
+} from "@/utils/account-timeline";
 
 export type TopShare = {
   limit: number;
@@ -128,6 +134,10 @@ type PeriodLists = {
   topTracks: Record<LastFmPeriod, TopTrack[]>;
 };
 
+type ListeningAnalyticsOptions = {
+  registeredAt?: number;
+};
+
 type RankedEntry = {
   key: string;
   label: string;
@@ -139,7 +149,6 @@ const TOP_SHARE_LIMITS = [5, 10, 25, 50];
 const SESSION_GAP_SECONDS = 45 * 60;
 const CURRENT_WINDOW_DAYS = 30;
 const PERIODS: LastFmPeriod[] = ["overall", "7day", "1month", "3month", "6month", "12month"];
-const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" });
 
 export const createEmptyListeningAnalytics = (): SeriousListeningAnalytics => ({
   concentration: {
@@ -194,6 +203,7 @@ export const createEmptyListeningAnalytics = (): SeriousListeningAnalytics => ({
 export const deriveListeningAnalytics = (
   recentTracks: CachedRecentTrack[],
   periodLists: PeriodLists,
+  options?: ListeningAnalyticsOptions,
 ): SeriousListeningAnalytics => {
   if (recentTracks.length === 0) {
     return {
@@ -207,13 +217,17 @@ export const deriveListeningAnalytics = (
   );
   const latestTimestamp = chronological.at(-1)?.playedAtTimestamp ?? 0;
   const currentFrom = latestTimestamp - CURRENT_WINDOW_DAYS * 86_400;
+  const timelineStart = resolveTimelineStart(
+    options?.registeredAt,
+    chronological[0]?.playedAtTimestamp,
+  );
 
   return {
     concentration: deriveConcentration(chronological),
-    discoveryReplay: deriveDiscoveryReplay(chronological),
-    libraryGrowth: deriveLibraryGrowth(chronological, latestTimestamp),
+    discoveryReplay: deriveDiscoveryReplay(chronological, timelineStart),
+    libraryGrowth: deriveLibraryGrowth(chronological, latestTimestamp, timelineStart),
     rankMovement: deriveRankMovement(periodLists),
-    sessions: deriveSessions(chronological),
+    sessions: deriveSessions(chronological, timelineStart),
     overlap: deriveOverlap(chronological, currentFrom),
   };
 };
@@ -235,9 +249,15 @@ const deriveConcentration = (tracks: CachedRecentTrack[]): ListeningConcentratio
   };
 };
 
-const deriveDiscoveryReplay = (tracks: CachedRecentTrack[]): DiscoveryReplayStats => {
+const deriveDiscoveryReplay = (
+  tracks: CachedRecentTrack[],
+  timelineStart?: number,
+): DiscoveryReplayStats => {
   const seen = new Map<string, number>();
-  const months = new Map<string, DiscoveryReplayMonth>();
+  const months = new Map<
+    string,
+    Pick<DiscoveryReplayMonth, "newPlays" | "repeatPlays" | "heavyRepeatPlays" | "total">
+  >();
   let newPlays = 0;
   let repeatPlays = 0;
   let heavyRepeatPlays = 0;
@@ -245,7 +265,7 @@ const deriveDiscoveryReplay = (tracks: CachedRecentTrack[]): DiscoveryReplayStat
   for (const track of tracks) {
     const key = trackKey(track);
     const seenCount = seen.get(key) ?? 0;
-    const month = getOrCreateDiscoveryMonth(months, monthLabel(track.playedAtTimestamp));
+    const month = getOrCreateDiscoveryMonth(months, monthKeyFromTimestamp(track.playedAtTimestamp));
 
     if (seenCount === 0) {
       month.newPlays += 1;
@@ -265,7 +285,9 @@ const deriveDiscoveryReplay = (tracks: CachedRecentTrack[]): DiscoveryReplayStat
   const total = newPlays + repeatPlays + heavyRepeatPlays;
 
   return {
-    months: [...months.values()],
+    months: timelineStart
+      ? fillDiscoveryReplayMonths(months, timelineStart)
+      : toDiscoveryReplayMonths(months),
     newPlays,
     repeatPlays,
     heavyRepeatPlays,
@@ -276,18 +298,25 @@ const deriveDiscoveryReplay = (tracks: CachedRecentTrack[]): DiscoveryReplayStat
 const deriveLibraryGrowth = (
   tracks: CachedRecentTrack[],
   latestTimestamp: number,
+  timelineStart?: number,
 ): LibraryGrowthStats => {
   const artists = new Set<string>();
   const albums = new Set<string>();
   const trackKeys = new Set<string>();
-  const months = new Map<string, LibraryGrowthMonth>();
+  const months = new Map<
+    string,
+    Pick<
+      LibraryGrowthMonth,
+      "artists" | "albums" | "tracks" | "newArtists" | "newAlbums" | "newTracks"
+    >
+  >();
   let growth30Days = 0;
   let growth90Days = 0;
   let growth365Days = 0;
 
   for (const track of tracks) {
-    const label = monthLabel(track.playedAtTimestamp);
-    const month = getOrCreateGrowthMonth(months, label);
+    const monthKey = monthKeyFromTimestamp(track.playedAtTimestamp);
+    const month = getOrCreateGrowthMonth(months, monthKey);
     const newItems = [
       addUnique(artists, artistKey(track)),
       track.albumName ? addUnique(albums, albumKey(track)) : false,
@@ -312,7 +341,9 @@ const deriveLibraryGrowth = (
   }
 
   return {
-    months: [...months.values()],
+    months: timelineStart
+      ? fillLibraryGrowthMonths(months, timelineStart)
+      : toLibraryGrowthMonths(months),
     growth30Days,
     growth90Days,
     growth365Days,
@@ -338,7 +369,10 @@ const deriveRankMovement = (periodLists: PeriodLists): RankMovementStats => {
   };
 };
 
-const deriveSessions = (tracks: CachedRecentTrack[]): ListeningSessionStats => {
+const deriveSessions = (
+  tracks: CachedRecentTrack[],
+  timelineStart?: number,
+): ListeningSessionStats => {
   const sessions: CachedRecentTrack[][] = [];
   let current: CachedRecentTrack[] = [];
 
@@ -362,9 +396,12 @@ const deriveSessions = (tracks: CachedRecentTrack[]): ListeningSessionStats => {
   const months = new Map<string, number>();
 
   for (const session of sessions) {
-    const label = monthLabel(session[0]?.playedAtTimestamp ?? 0);
+    const timestamp = session[0]?.playedAtTimestamp ?? 0;
 
-    months.set(label, (months.get(label) ?? 0) + 1);
+    if (timestamp <= 0) continue;
+
+    const monthKey = monthKeyFromTimestamp(timestamp);
+    months.set(monthKey, (months.get(monthKey) ?? 0) + 1);
   }
 
   return {
@@ -376,7 +413,14 @@ const deriveSessions = (tracks: CachedRecentTrack[]): ListeningSessionStats => {
     longestDurationMinutes: Math.max(0, ...durations),
     averageArtists: average(artistCounts),
     averageFocus: average(focusScores),
-    months: [...months.entries()].map(([label, count]) => ({ label, count })),
+    months: timelineStart
+      ? monthRangeKeys(timelineStart).map((key) => ({
+          label: formatMonthKeyAnalytics(key),
+          count: months.get(key) ?? 0,
+        }))
+      : [...months.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, count]) => ({ label: formatMonthKeyAnalytics(key), count })),
     durationBuckets: buildDurationBuckets(durations),
   };
 };
@@ -389,7 +433,9 @@ const deriveOverlap = (
   const historicalArtists = topRanked(countEntries(tracks, artistEntry), 50);
   const recentArtists = topRanked(countEntries(recent, artistEntry), 50);
   const historicalArtistKeys = new Set(historicalArtists.map((item) => item.id));
-  const recentArtistTopPlays = recent.filter((track) => historicalArtistKeys.has(artistKey(track))).length;
+  const recentArtistTopPlays = recent.filter((track) =>
+    historicalArtistKeys.has(artistKey(track)),
+  ).length;
 
   return {
     currentWindowDays: CURRENT_WINDOW_DAYS,
@@ -503,25 +549,39 @@ const buildConcentrationCurve = (counts: number[], total: number) => {
   });
 };
 
-const getOrCreateDiscoveryMonth = (months: Map<string, DiscoveryReplayMonth>, label: string) => {
-  const current = months.get(label);
+const getOrCreateDiscoveryMonth = (
+  months: Map<
+    string,
+    Pick<DiscoveryReplayMonth, "newPlays" | "repeatPlays" | "heavyRepeatPlays" | "total">
+  >,
+  key: string,
+) => {
+  const current = months.get(key);
 
   if (current) return current;
 
-  const month = { label, newPlays: 0, repeatPlays: 0, heavyRepeatPlays: 0, total: 0 };
+  const month = { newPlays: 0, repeatPlays: 0, heavyRepeatPlays: 0, total: 0 };
 
-  months.set(label, month);
+  months.set(key, month);
   return month;
 };
 
-const getOrCreateGrowthMonth = (months: Map<string, LibraryGrowthMonth>, label: string) => {
-  const current = months.get(label);
+const getOrCreateGrowthMonth = (
+  months: Map<
+    string,
+    Pick<
+      LibraryGrowthMonth,
+      "artists" | "albums" | "tracks" | "newArtists" | "newAlbums" | "newTracks"
+    >
+  >,
+  key: string,
+) => {
+  const current = months.get(key);
 
   if (current) return current;
 
   const previous = [...months.values()].at(-1);
   const month = {
-    label,
     artists: previous?.artists ?? 0,
     albums: previous?.albums ?? 0,
     tracks: previous?.tracks ?? 0,
@@ -530,15 +590,109 @@ const getOrCreateGrowthMonth = (months: Map<string, LibraryGrowthMonth>, label: 
     newTracks: 0,
   };
 
-  months.set(label, month);
+  months.set(key, month);
   return month;
 };
+
+const fillDiscoveryReplayMonths = (
+  months: Map<
+    string,
+    Pick<DiscoveryReplayMonth, "newPlays" | "repeatPlays" | "heavyRepeatPlays" | "total">
+  >,
+  timelineStart: number,
+): DiscoveryReplayMonth[] =>
+  monthRangeKeys(timelineStart).map((key) => {
+    const month = months.get(key);
+
+    return {
+      label: formatMonthKeyAnalytics(key),
+      newPlays: month?.newPlays ?? 0,
+      repeatPlays: month?.repeatPlays ?? 0,
+      heavyRepeatPlays: month?.heavyRepeatPlays ?? 0,
+      total: month?.total ?? 0,
+    };
+  });
+
+const toDiscoveryReplayMonths = (
+  months: Map<
+    string,
+    Pick<DiscoveryReplayMonth, "newPlays" | "repeatPlays" | "heavyRepeatPlays" | "total">
+  >,
+): DiscoveryReplayMonth[] =>
+  [...months.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, month]) => ({
+      label: formatMonthKeyAnalytics(key),
+      ...month,
+    }));
+
+const fillLibraryGrowthMonths = (
+  months: Map<
+    string,
+    Pick<
+      LibraryGrowthMonth,
+      "artists" | "albums" | "tracks" | "newArtists" | "newAlbums" | "newTracks"
+    >
+  >,
+  timelineStart: number,
+): LibraryGrowthMonth[] => {
+  let artists = 0;
+  let albums = 0;
+  let tracks = 0;
+
+  return monthRangeKeys(timelineStart).map((key) => {
+    const month = months.get(key);
+
+    if (month) {
+      artists = month.artists;
+      albums = month.albums;
+      tracks = month.tracks;
+
+      return {
+        label: formatMonthKeyAnalytics(key),
+        artists,
+        albums,
+        tracks,
+        newArtists: month.newArtists,
+        newAlbums: month.newAlbums,
+        newTracks: month.newTracks,
+      };
+    }
+
+    return {
+      label: formatMonthKeyAnalytics(key),
+      artists,
+      albums,
+      tracks,
+      newArtists: 0,
+      newAlbums: 0,
+      newTracks: 0,
+    };
+  });
+};
+
+const toLibraryGrowthMonths = (
+  months: Map<
+    string,
+    Pick<
+      LibraryGrowthMonth,
+      "artists" | "albums" | "tracks" | "newArtists" | "newAlbums" | "newTracks"
+    >
+  >,
+): LibraryGrowthMonth[] =>
+  [...months.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, month]) => ({
+      label: formatMonthKeyAnalytics(key),
+      ...month,
+    }));
 
 const pickMovementPeriod = (
   artists: Record<LastFmPeriod, TopArtist[]>,
 ): Exclude<LastFmPeriod, "overall"> =>
-  PERIODS.filter((period): period is Exclude<LastFmPeriod, "overall"> => period !== "overall")
-    .find((period) => artists[period].length > 0) ?? "1month";
+  PERIODS.filter((period): period is Exclude<LastFmPeriod, "overall"> => period !== "overall").find(
+    (period) => artists[period].length > 0,
+  ) ?? "1month";
 
 const buildRankMovement = <TItem extends { rank?: number }>(
   overall: TItem[],
@@ -554,7 +708,9 @@ const buildRankMovement = <TItem extends { rank?: number }>(
       const overallRank = overallRanks.get(key);
       const periodRank = item.rank;
       const delta =
-        overallRank !== undefined && periodRank !== undefined ? overallRank - periodRank : undefined;
+        overallRank !== undefined && periodRank !== undefined
+          ? overallRank - periodRank
+          : undefined;
       const status =
         overallRank === undefined
           ? "new"
@@ -646,8 +802,6 @@ const addUnique = (set: Set<string>, key: string) => {
 };
 
 const countTrue = (values: boolean[]) => values.filter(Boolean).length;
-
-const monthLabel = (timestamp: number) => MONTH_FORMAT.format(new Date(timestamp * 1000));
 
 const normalizeKeyPart = (value: string | undefined) => value?.trim().toLocaleLowerCase() ?? "";
 

@@ -7,7 +7,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "check-types": "tsc --noEmit",
-    "check": "oxlint && oxfmt --write",
+    "check": "oxlint",
     "prepare": "husky"
   },
   "dependencies": {

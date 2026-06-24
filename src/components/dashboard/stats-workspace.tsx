@@ -74,12 +74,14 @@ export function StatsWorkspace() {
   const [syncingUsername, setSyncingUsername] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<LastFmPeriod>("overall");
   const [isSyncing, setIsSyncing] = useState(false);
-  const [exportState, setExportState] = useState<{
-    rowsWritten: number;
-    bytesWritten: number;
-  } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState({
+    rowsWritten: 0,
+    bytesWritten: 0,
+  });
   const abortRef = useRef<AbortController | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
+  const exportActiveRef = useRef(false);
 
   const syncTarget = username.trim() || selectedUsername;
 
@@ -124,6 +126,8 @@ export function StatsWorkspace() {
     : undefined;
 
   const syncBarSnapshot = isSyncing ? syncingSnapshot : syncTargetSnapshot;
+  const isSwitchingUser =
+    isSyncing && Boolean(syncingUsernameLower) && syncingUsernameLower !== selectedUsernameLower;
   const hasCachedData = snapshotHasCachedData(syncTargetSnapshot);
   const canResumeSync =
     !isSyncing &&
@@ -226,7 +230,9 @@ export function StatsWorkspace() {
 
     const controller = new AbortController();
     exportAbortRef.current = controller;
-    setExportState({ rowsWritten: 0, bytesWritten: 0 });
+    exportActiveRef.current = true;
+    setIsExporting(true);
+    setExportProgress({ rowsWritten: 0, bytesWritten: 0 });
 
     try {
       const result = await exportScrobblesToCsv({
@@ -234,7 +240,9 @@ export function StatsWorkspace() {
         username: nextUsername,
         signal: controller.signal,
         onProgress: (progress) => {
-          setExportState(progress);
+          if (!exportActiveRef.current) return;
+
+          setExportProgress(progress);
         },
       });
       toast.success(`Exported ${result.rowsWritten.toLocaleString()} scrobbles.`);
@@ -253,11 +261,12 @@ export function StatsWorkspace() {
 
       toast.error(message);
     } finally {
+      exportActiveRef.current = false;
+      setIsExporting(false);
+
       if (exportAbortRef.current === controller) {
         exportAbortRef.current = null;
       }
-
-      setExportState(null);
     }
   };
 
@@ -368,7 +377,7 @@ export function StatsWorkspace() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={
-                              exportState !== null ||
+                              isExporting ||
                               !syncTarget ||
                               (syncTargetSnapshot?.counts.recentTracks ?? 0) === 0
                             }
@@ -406,11 +415,11 @@ export function StatsWorkspace() {
                       />
                     </div>
                   )}
-                  {exportState && (
+                  {isExporting && (
                     <div className="mx-auto w-full max-w-md rounded-md">
                       <ScrobbleExportBar
-                        rowsWritten={exportState.rowsWritten}
-                        bytesWritten={exportState.bytesWritten}
+                        rowsWritten={exportProgress.rowsWritten}
+                        bytesWritten={exportProgress.bytesWritten}
                         onCancel={() => exportAbortRef.current?.abort()}
                       />
                     </div>
@@ -435,15 +444,17 @@ export function StatsWorkspace() {
                 </section>
 
                 {/* Loading state */}
-                {selectedUsername && !snapshot && (
-                  <div className="animate-section-in motion-reduce:animate-none flex w-full max-w-md flex-col rounded-md items-center py-20 text-center">
+                {(isSwitchingUser || (selectedUsername && !snapshot)) && (
+                  <div className="animate-section-in motion-reduce:animate-none mx-auto flex w-full max-w-md flex-col items-center rounded-md py-20 text-center">
                     <LoaderCircleIcon className="size-6 animate-spin text-muted-foreground" />
-                    <p className="mt-4 text-sm text-muted-foreground">Loading your music…</p>
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      {isSwitchingUser ? `Syncing ${syncingUsername}…` : "Loading your music…"}
+                    </p>
                   </div>
                 )}
 
                 {/* Dashboard */}
-                {snapshot && (
+                {snapshot && !isSwitchingUser && (
                   <DashboardProvider
                     snapshot={snapshot}
                     selectedPeriod={selectedPeriod}

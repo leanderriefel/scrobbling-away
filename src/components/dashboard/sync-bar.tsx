@@ -32,10 +32,17 @@ export function SyncBar({
   const sync = snapshot?.sync;
   const total = sync?.total ?? 0;
   const fetched = sync?.fetched ?? 0;
-  const progress = total > 0 ? Math.min(100, Math.round((fetched / total) * 100)) : 0;
   const status = sync?.status ?? "idle";
   const phase = sync?.phase ?? "idle";
   const active = isLoading;
+  const progress =
+    total > 0
+      ? fetched >= total
+        ? 100
+        : Math.min(99, Math.round((fetched / total) * 100))
+      : active
+        ? undefined
+        : 100;
 
   const label = active
     ? (phaseLabels[phase] ?? "Loading…")
@@ -74,13 +81,13 @@ export function SyncBar({
           />
         )}
         <span>{label}</span>
-        {active && total > 0 && (
+        {active && progress !== undefined && (
           <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
             {progress}%
           </span>
         )}
       </div>
-      {active && <Progress value={progress} className="h-[2px]" />}
+      {active && progress !== undefined && <Progress value={progress} className="h-[2px]" />}
     </div>
   );
 }

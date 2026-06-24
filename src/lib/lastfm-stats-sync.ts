@@ -374,6 +374,7 @@ const syncRecentTrackHistoryQuick = async (context: SyncContext, profile: UserIn
       ? registeredAt
       : Math.min(cacheState.latestTimestamp + 1, to);
   const saved = { count: cacheState.count };
+  const baseline = cacheState.count;
   const remaining = Math.max(0, playcount - cacheState.count);
 
   await emitProgress(context, {
@@ -386,22 +387,30 @@ const syncRecentTrackHistoryQuick = async (context: SyncContext, profile: UserIn
     total: playcount,
   });
 
-  if (remaining > 0 && from < to) {
-    await syncRecentRange(context, { from, to }, saved, 0);
-  } else if (cacheState.count > 0) {
+  const markRecentTracksComplete = async (message: string) => {
     await emitProgress(context, {
-      message: "Already up to date",
-      fetched: cacheState.count,
+      phase: "recent-tracks",
+      message,
+      fetched: playcount,
       total: playcount,
     });
-    return;
+  };
+
+  if (remaining === 0 || from >= to) {
+    if (cacheState.count > 0) {
+      await markRecentTracksComplete("Already up to date");
+      return;
+    }
+  } else {
+    await syncRecentRange(context, { from, to }, saved, 0);
+
+    if (saved.count === baseline) {
+      await markRecentTracksComplete("Already up to date");
+      return;
+    }
   }
 
-  await emitProgress(context, {
-    message: `${saved.count.toLocaleString()} scrobbles saved`,
-    fetched: saved.count,
-    total: playcount,
-  });
+  await markRecentTracksComplete(`${saved.count.toLocaleString()} scrobbles saved`);
 };
 
 const syncRecentTrackHistoryDeep = async (context: SyncContext, profile: UserInfo) => {
@@ -1031,7 +1040,10 @@ const resolveRecentTrackImages = async (context: SyncContext) => {
 const resolveMissingImages = async (context: SyncContext) => {
   throwIfAborted(context.signal);
   await emitProgress(context, {
+    phase: "snapshot",
     message: "Resolving missing artist and track images",
+    fetched: 0,
+    total: undefined,
   });
 
   try {

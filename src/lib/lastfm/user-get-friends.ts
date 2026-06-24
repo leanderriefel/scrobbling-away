@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  lastFmListSchema,
   lastFmPaginatedMetaSchema,
   lastFmRawUserSchema,
   normalizeLastFmUser,
@@ -27,7 +28,7 @@ const lastFmFriendSchema = lastFmRawUserSchema
 
 export const getFriendsResponseSchema = z.object({
   friends: z.object({
-    user: z.array(lastFmFriendSchema),
+    user: lastFmListSchema(lastFmFriendSchema),
     "@attr": lastFmPaginatedMetaSchema,
   }),
 });

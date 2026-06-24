@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   lastFmImageSchema,
+  lastFmListSchema,
   lastFmPeriodPaginatedMetaSchema,
   lastFmPeriodSchema,
   lastFmStreamableSchema,
@@ -45,7 +46,7 @@ const lastFmTopArtistSchema = z
 
 export const getTopArtistsResponseSchema = z.object({
   topartists: z.object({
-    artist: z.array(lastFmTopArtistSchema),
+    artist: lastFmListSchema(lastFmTopArtistSchema),
     "@attr": topArtistsMetaSchema,
   }),
 });

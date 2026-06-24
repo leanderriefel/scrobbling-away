@@ -6,17 +6,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useRouterState } from "@tanstack/react-router";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 const footerLinkClass =
-  "text-muted-foreground underline-offset-4 transition-all duration-300 hover:text-foreground hover:underline hover:scale-[1.02] inline-block";
+  "text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline";
 
 export const SiteFooter = () => {
+  const onDocs = useRouterState({
+    select: (state) => state.location.pathname.startsWith("/docs"),
+  });
+
+  if (onDocs) {
+    return (
+      <footer className="border-t border-border/50 bg-background">
+        <div className="mx-auto max-w-[960px] px-5 py-6 text-[12px] text-muted-foreground">
+          © {CURRENT_YEAR} Leander Riefel
+        </div>
+      </footer>
+    );
+  }
+
   return (
-    <footer className="relative mt-12">
-      <div className="dither-border absolute top-0 left-0 right-0" />
-      <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-5 text-[11px] text-muted-foreground">
+    <footer className="mt-auto border-t border-border/50 bg-background">
+      <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-5 text-[12px] text-muted-foreground">
         <p>© {CURRENT_YEAR} Leander Riefel</p>
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Dialog>

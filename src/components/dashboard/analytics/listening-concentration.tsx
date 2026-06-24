@@ -81,9 +81,9 @@ function ArtistShareDiagram({
               }
             >
               <span className="font-mono text-muted-foreground">Top {share.limit}</span>
-              <div className="h-2 overflow-hidden rounded-sm bg-chart-track">
+              <div className="h-2 overflow-hidden rounded-md bg-chart-track">
                 <div
-                  className="h-full rounded-sm bg-chart-1 transition-opacity duration-200 hover:opacity-100"
+                  className="h-full rounded-md bg-chart-1 transition-opacity duration-200 hover:opacity-100"
                   style={{
                     width: `${Math.max(2, share.share * 100)}%`,
                     opacity: chartValueOpacity(maxShare > 0 ? share.share / maxShare : 0),
@@ -122,7 +122,7 @@ function ThresholdBlock({ label, value, help }: { label: string; value: string; 
       <TooltipTrigger
         render={
           <div
-            className="min-w-0 rounded-sm bg-muted/30 px-3 py-2 outline-none transition-colors hover:bg-accent/40 focus-visible:bg-accent/40"
+            className="min-w-0 rounded-md bg-muted/30 px-3 py-2 outline-none transition-colors hover:bg-accent/40 focus-visible:bg-accent/40"
             tabIndex={0}
           />
         }

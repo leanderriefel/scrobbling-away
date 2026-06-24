@@ -11,12 +11,14 @@ import { SectionTitle } from "./section-title";
 type ListeningClockProps = {
   buckets?: TimeBucket[];
   compact?: boolean;
+  showTitle?: boolean;
   snapshot?: LastFmStatsSnapshot;
 };
 
 export const ListeningClock = ({
   buckets: bucketsProp,
   compact = false,
+  showTitle = true,
   snapshot: snapshotProp,
 }: ListeningClockProps = {}) => {
   const contextSnapshot = useOptionalDashboardSnapshot();
@@ -74,9 +76,14 @@ export const ListeningClock = ({
 
   return (
     <div className="grid gap-5">
-      <SectionTitle description="Scrobbles grouped by the hour they were played.">
-        When you listen
-      </SectionTitle>
+      {showTitle && (
+        <SectionTitle
+          variant="subsection"
+          description="Scrobbles grouped by the hour they were played."
+        >
+          When you listen
+        </SectionTitle>
+      )}
       {chart}
     </div>
   );

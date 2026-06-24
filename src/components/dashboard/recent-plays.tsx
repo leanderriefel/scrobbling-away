@@ -14,7 +14,7 @@ export function RecentPlays() {
   const tracks = snapshot.recentTracks;
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <SectionTitle description="Most recent scrobbles from Last.fm.">Recently played</SectionTitle>
       {tracks.length > 0 ? (
         <VirtualList
@@ -23,7 +23,9 @@ export function RecentPlays() {
           renderItem={(track) => <RecentPlayRow snapshot={snapshot} track={track} />}
         />
       ) : (
-        <div className="py-10 text-center text-sm text-muted-foreground">No recent plays yet</div>
+        <div className="py-8 text-center text-[13px] text-muted-foreground">
+          No recent plays yet
+        </div>
       )}
     </div>
   );
@@ -42,7 +44,7 @@ function RecentPlayRow({
   return (
     <button
       type="button"
-      className="group relative flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-left transition-all duration-300 ease-out hover:bg-accent/40 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-full before:bg-primary before:opacity-0 before:transition-all before:duration-300 hover:before:opacity-100 hover:pl-3"
+      className="flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/40"
       onClick={() =>
         openItemDetail({
           kind: "track",
@@ -59,11 +61,11 @@ function RecentPlayRow({
         <img
           src={imageUrl}
           alt=""
-          className="size-9 shrink-0 rounded object-cover"
+          className="size-8 shrink-0 rounded-md object-cover"
           loading="lazy"
         />
       ) : (
-        <span className="grid size-9 shrink-0 place-items-center rounded bg-muted/60">
+        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-muted/60">
           <Music2Icon className="size-3.5 text-muted-foreground/50" />
         </span>
       )}
@@ -73,7 +75,7 @@ function RecentPlayRow({
           {track.artistName}
         </span>
       </span>
-      <span className="shrink-0 font-mono text-[11px] text-muted-foreground/60">
+      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
         {formatTimeAgo(track.playedAtTimestamp)}
       </span>
     </button>

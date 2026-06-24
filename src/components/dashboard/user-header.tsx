@@ -21,26 +21,30 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
   const isCompare = variant === "compare";
 
   return (
-    <div className="grid gap-8">
-      <div className={cn("flex min-w-0 items-center", isCompare ? "gap-6" : "gap-8")}>
-        <Avatar size="lg" className="shimmer-ring">
-          {profileImage && <AvatarImage src={profileImage} alt="" />}
-          <AvatarFallback>{displayName.slice(0, 2)}</AvatarFallback>
+    <div className={cn("grid gap-6", !isCompare && "border-b border-border/40 pb-8")}>
+      <div className={cn("flex min-w-0 items-center", isCompare ? "gap-4" : "gap-5")}>
+        <Avatar size={isCompare ? "default" : "lg"} className="rounded-lg">
+          {profileImage && <AvatarImage src={profileImage} alt="" className="rounded-lg" />}
+          <AvatarFallback className="rounded-lg">{displayName.slice(0, 2)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
           {isCompare ? (
-            <h3 className="truncate text-xl font-bold tracking-tight">{displayName}</h3>
+            <h3 className="truncate text-[15px] font-medium">{displayName}</h3>
           ) : (
-            <h1 className="truncate text-2xl font-bold tracking-tight">{displayName}</h1>
+            <h1 className="truncate text-[15px] font-medium tracking-[-0.01em] text-foreground">
+              {displayName}
+            </h1>
           )}
-          {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
+          {subtitle && (
+            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{subtitle}</p>
+          )}
         </div>
       </div>
 
       <div
         className={cn(
-          "grid gap-x-10 gap-y-8",
-          isCompare ? "grid-cols-2 md:grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
+          "grid gap-x-8 gap-y-5",
+          isCompare ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
         )}
       >
         <StatBlock
@@ -64,7 +68,7 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
         <StatBlock
           label={isCompare ? "Repeat" : "Repeat rate"}
           value={formatPercent(signature.repeatRate)}
-          help="Share of scrobbles for tracks seen before. Formula: repeats / scrobbles."
+          help="Share of scrobbles for tracks seen before."
           showHelp={!isCompare}
         />
       </div>
@@ -84,14 +88,10 @@ const StatBlock = ({
   value: string;
 }) => (
   <div className="min-w-0">
-    <div
-      className={cn(
-        "truncate font-mono text-4xl font-light tabular-nums tracking-normal metallic-text",
-      )}
-    >
+    <div className="truncate font-mono text-lg tabular-nums tracking-tight text-foreground">
       {value}
     </div>
-    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] tracking-wide text-muted-foreground/80">
+    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/80">
       <span>{label}</span>
       {showHelp && <HelpTooltip>{help}</HelpTooltip>}
     </div>

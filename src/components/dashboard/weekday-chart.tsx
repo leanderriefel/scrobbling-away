@@ -73,7 +73,9 @@ export const WeekdayChart = ({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <SectionTitle description="Scrobbles grouped by weekday.">By day</SectionTitle>
+      <SectionTitle variant="subsection" description="Scrobbles grouped by weekday.">
+        By day
+      </SectionTitle>
       {chart}
     </div>
   );

@@ -203,6 +203,8 @@ const StatCard = ({ help, label, value }: { help?: string; label: string; value:
       <span>{label}</span>
       {help ? <HelpTooltip>{help}</HelpTooltip> : null}
     </div>
-    <div className="mt-1 font-mono text-base font-light tabular-nums metallic-text">{value}</div>
+    <div className="mt-1 font-mono text-[15px] font-normal tabular-nums text-foreground">
+      {value}
+    </div>
   </div>
 );

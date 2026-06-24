@@ -13,7 +13,7 @@ export function ScrobbleExportBar({
   onCancel: () => void;
 }) {
   return (
-    <div className="grid gap-2 rounded-sm border border-border/60 bg-background/80 px-3 py-2.5">
+    <div className="grid gap-2 rounded-lg border border-border/60 px-3 py-2.5">
       <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
         <LoaderCircleIcon className="size-3 animate-spin" />
         <span>Exporting scrobbles…</span>

@@ -8,79 +8,140 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as DocsRouteRouteImport } from "./routes/docs/route";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as DocsIndexRouteImport } from "./routes/docs/index";
+import { Route as DocsSlugRouteImport } from "./routes/docs/$slug";
+import { Route as ApiRpcSplatRouteImport } from "./routes/api/rpc/$";
 
+const DocsRouteRoute = DocsRouteRouteImport.update({
+  id: "/docs",
+  path: "/docs",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: "/",
+  path: "/",
+  getParentRoute: () => DocsRouteRoute,
+} as any);
+const DocsSlugRoute = DocsSlugRouteImport.update({
+  id: "/$slug",
+  path: "/$slug",
+  getParentRoute: () => DocsRouteRoute,
+} as any);
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
-  id: '/api/rpc/$',
-  path: '/api/rpc/$',
+  id: "/api/rpc/$",
+  path: "/api/rpc/$",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  "/": typeof IndexRoute;
+  "/docs": typeof DocsRouteRouteWithChildren;
+  "/docs/$slug": typeof DocsSlugRoute;
+  "/docs/": typeof DocsIndexRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  "/": typeof IndexRoute;
+  "/docs/$slug": typeof DocsSlugRoute;
+  "/docs": typeof DocsIndexRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/docs": typeof DocsRouteRouteWithChildren;
+  "/docs/$slug": typeof DocsSlugRoute;
+  "/docs/": typeof DocsIndexRoute;
+  "/api/rpc/$": typeof ApiRpcSplatRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/rpc/$'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/rpc/$'
-  id: '__root__' | '/' | '/api/rpc/$'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: "/" | "/docs" | "/docs/$slug" | "/docs/" | "/api/rpc/$";
+  fileRoutesByTo: FileRoutesByTo;
+  to: "/" | "/docs/$slug" | "/docs" | "/api/rpc/$";
+  id: "__root__" | "/" | "/docs" | "/docs/$slug" | "/docs/" | "/api/rpc/$";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ApiRpcSplatRoute: typeof ApiRpcSplatRoute
+  IndexRoute: typeof IndexRoute;
+  DocsRouteRoute: typeof DocsRouteRouteWithChildren;
+  ApiRpcSplatRoute: typeof ApiRpcSplatRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/rpc/$': {
-      id: '/api/rpc/$'
-      path: '/api/rpc/$'
-      fullPath: '/api/rpc/$'
-      preLoaderRoute: typeof ApiRpcSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/docs": {
+      id: "/docs";
+      path: "/docs";
+      fullPath: "/docs";
+      preLoaderRoute: typeof DocsRouteRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/docs/": {
+      id: "/docs/";
+      path: "/";
+      fullPath: "/docs/";
+      preLoaderRoute: typeof DocsIndexRouteImport;
+      parentRoute: typeof DocsRouteRoute;
+    };
+    "/docs/$slug": {
+      id: "/docs/$slug";
+      path: "/$slug";
+      fullPath: "/docs/$slug";
+      preLoaderRoute: typeof DocsSlugRouteImport;
+      parentRoute: typeof DocsRouteRoute;
+    };
+    "/api/rpc/$": {
+      id: "/api/rpc/$";
+      path: "/api/rpc/$";
+      fullPath: "/api/rpc/$";
+      preLoaderRoute: typeof ApiRpcSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
+interface DocsRouteRouteChildren {
+  DocsSlugRoute: typeof DocsSlugRoute;
+  DocsIndexRoute: typeof DocsIndexRoute;
+}
+
+const DocsRouteRouteChildren: DocsRouteRouteChildren = {
+  DocsSlugRoute: DocsSlugRoute,
+  DocsIndexRoute: DocsIndexRoute,
+};
+
+const DocsRouteRouteWithChildren = DocsRouteRoute._addFileChildren(DocsRouteRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocsRouteRoute: DocsRouteRouteWithChildren,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { createStart } from "@tanstack/react-start";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }

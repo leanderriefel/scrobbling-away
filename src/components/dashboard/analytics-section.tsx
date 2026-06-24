@@ -1,3 +1,4 @@
+import { AdvancedAnalyticsSection } from "./analytics/advanced-analytics-section";
 import { CurrentOverlap } from "./analytics/current-overlap";
 import { DiscoveryReplay } from "./analytics/discovery-replay";
 import { LibraryGrowth } from "./analytics/library-growth";
@@ -10,7 +11,7 @@ export function AnalyticsSection() {
   const analytics = useDashboardSnapshot().derived.analytics;
 
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-6">
       <SectionTitle description="Deeper metrics calculated from scrobbles and Last.fm rankings.">
         Analytics
       </SectionTitle>
@@ -21,6 +22,7 @@ export function AnalyticsSection() {
         <ListeningSessions analytics={analytics.sessions} />
         <CurrentOverlap analytics={analytics.overlap} />
       </div>
+      <AdvancedAnalyticsSection />
     </div>
   );
 }

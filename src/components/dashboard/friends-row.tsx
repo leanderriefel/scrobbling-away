@@ -17,7 +17,7 @@ export function FriendsRow() {
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium tracking-wide text-muted-foreground">
         Friends
         <HelpTooltip>Last.fm friends returned for this user.</HelpTooltip>
       </span>

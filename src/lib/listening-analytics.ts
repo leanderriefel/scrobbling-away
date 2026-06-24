@@ -1,5 +1,15 @@
+import {
+  createEmptyAdvancedListeningAnalytics,
+  deriveAdvancedListeningAnalytics,
+  type AdvancedListeningAnalytics,
+} from "@/lib/advanced-listening-analytics";
 import type { TopAlbum, TopArtist, TopTrack } from "@/lib/lastfm";
 import type { CachedRecentTrack, LastFmPeriod, RankedStat } from "@/lib/lastfm-stats-cache";
+import {
+  resolveSessionGapSeconds,
+  sortTracksChronologically,
+  splitListeningSessions,
+} from "@/lib/listening-sessions";
 import {
   formatMonthKeyAnalytics,
   monthKeyFromTimestamp,
@@ -93,6 +103,7 @@ export type SessionBucket = {
 
 export type ListeningSessionStats = {
   totalSessions: number;
+  gapSeconds: number;
   averageDurationMinutes: number;
   medianDurationMinutes: number;
   averageTracks: number;
@@ -126,6 +137,7 @@ export type SeriousListeningAnalytics = {
   rankMovement: RankMovementStats;
   sessions: ListeningSessionStats;
   overlap: CurrentHistoricalOverlapStats;
+  advanced: AdvancedListeningAnalytics;
 };
 
 type PeriodLists = {
@@ -146,7 +158,6 @@ type RankedEntry = {
 };
 
 const TOP_SHARE_LIMITS = [5, 10, 25, 50];
-const SESSION_GAP_SECONDS = 45 * 60;
 const CURRENT_WINDOW_DAYS = 30;
 const PERIODS: LastFmPeriod[] = ["overall", "7day", "1month", "3month", "6month", "12month"];
 
@@ -181,6 +192,7 @@ export const createEmptyListeningAnalytics = (): SeriousListeningAnalytics => ({
   },
   sessions: {
     totalSessions: 0,
+    gapSeconds: 0,
     averageDurationMinutes: 0,
     medianDurationMinutes: 0,
     averageTracks: 0,
@@ -198,6 +210,7 @@ export const createEmptyListeningAnalytics = (): SeriousListeningAnalytics => ({
     track: createEmptyOverlapList(),
     recentShareFromAllTimeTopArtists: 0,
   },
+  advanced: createEmptyAdvancedListeningAnalytics(),
 });
 
 export const deriveListeningAnalytics = (
@@ -212,9 +225,7 @@ export const deriveListeningAnalytics = (
     };
   }
 
-  const chronological = [...recentTracks].sort(
-    (left, right) => left.playedAtTimestamp - right.playedAtTimestamp,
-  );
+  const chronological = sortTracksChronologically(recentTracks);
   const latestTimestamp = chronological.at(-1)?.playedAtTimestamp ?? 0;
   const currentFrom = latestTimestamp - CURRENT_WINDOW_DAYS * 86_400;
   const timelineStart = resolveTimelineStart(
@@ -229,6 +240,7 @@ export const deriveListeningAnalytics = (
     rankMovement: deriveRankMovement(periodLists),
     sessions: deriveSessions(chronological, timelineStart),
     overlap: deriveOverlap(chronological, currentFrom),
+    advanced: deriveAdvancedListeningAnalytics(chronological, timelineStart),
   };
 };
 
@@ -373,21 +385,8 @@ const deriveSessions = (
   tracks: CachedRecentTrack[],
   timelineStart?: number,
 ): ListeningSessionStats => {
-  const sessions: CachedRecentTrack[][] = [];
-  let current: CachedRecentTrack[] = [];
-
-  for (const track of tracks) {
-    const previous = current.at(-1);
-
-    if (previous && track.playedAtTimestamp - previous.playedAtTimestamp >= SESSION_GAP_SECONDS) {
-      sessions.push(current);
-      current = [];
-    }
-
-    current.push(track);
-  }
-
-  if (current.length > 0) sessions.push(current);
+  const gapSeconds = resolveSessionGapSeconds(tracks);
+  const sessions = splitListeningSessions(tracks, gapSeconds);
 
   const durations = sessions.map(sessionDurationMinutes);
   const trackCounts = sessions.map((session) => session.length);
@@ -406,6 +405,7 @@ const deriveSessions = (
 
   return {
     totalSessions: sessions.length,
+    gapSeconds,
     averageDurationMinutes: average(durations),
     medianDurationMinutes: median(durations),
     averageTracks: average(trackCounts),

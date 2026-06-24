@@ -337,7 +337,7 @@ export const CompareWorkspace = () => {
                   )}
                   <button
                     type="button"
-                    className="rounded-sm p-0.5 hover:bg-muted"
+                    className="rounded-md p-0.5 hover:bg-muted"
                     aria-label={`Remove ${username}`}
                     onClick={() => removeCompareUser(username)}
                   >
@@ -357,7 +357,7 @@ export const CompareWorkspace = () => {
         )}
 
         {pendingUsernames.length > 0 && (
-          <div className="grid gap-2 rounded-sm bg-accent/30 px-3 py-2.5 text-[12px] text-muted-foreground">
+          <div className="grid gap-2 rounded-lg bg-accent/30 px-3 py-2.5 text-[12px] text-muted-foreground">
             <div className="flex items-center gap-2">
               <LoaderCircleIcon
                 className={

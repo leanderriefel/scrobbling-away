@@ -4,13 +4,7 @@ import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export function HelpTooltip({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function HelpTooltip({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -18,7 +12,7 @@ export function HelpTooltip({
           <button
             type="button"
             className={cn(
-              "inline-grid size-4 shrink-0 place-items-center rounded-sm text-muted-foreground/55 transition-colors hover:text-foreground focus-visible:text-foreground",
+              "inline-grid size-4 shrink-0 place-items-center rounded-lg text-muted-foreground/55 transition-colors hover:text-foreground focus-visible:text-foreground",
               className,
             )}
             aria-label="Explain this metric"

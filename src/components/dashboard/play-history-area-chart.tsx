@@ -148,7 +148,10 @@ export const PlayHistoryAreaChart = ({ points }: PlayHistoryAreaChartProps) => {
 };
 
 const PlayHistoryHeader = () => (
-  <SectionTitle description="Monthly plays from account creation through today. Months before you listened to this item show as zero.">
+  <SectionTitle
+    variant="subsection"
+    description="Monthly plays from account creation through today. Months before you listened to this item show as zero."
+  >
     Play history
   </SectionTitle>
 );

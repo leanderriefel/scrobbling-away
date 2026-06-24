@@ -172,3 +172,10 @@ export const lastFmUserSchema = lastFmRawUserSchema.transform(normalizeLastFmUse
 export const unixSeconds = (date: Date) => Math.floor(date.getTime() / 1000).toString();
 
 export const numberFromLastFm = (value: string) => Number(value);
+
+/** Last.fm returns a single object instead of a one-item array for list fields. */
+export const lastFmListSchema = <T extends z.ZodTypeAny>(item: T) =>
+  z.preprocess((value) => {
+    if (value === undefined || value === null || value === "") return [];
+    return Array.isArray(value) ? value : [value];
+  }, z.array(item));

@@ -45,7 +45,7 @@ export function VirtualList<TItem>({
     <div
       ref={parentRef}
       className={cn(
-        "scrollbar-thin overflow-y-auto rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
+        "scrollbar-thin overflow-y-auto rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
         className,
       )}
       style={{ height }}

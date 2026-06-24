@@ -97,7 +97,7 @@ export const Rankings = ({
   const { selectedPeriod, setSelectedPeriod } = useDashboardPeriod();
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       {showTitle && (
         <SectionTitle
           action={

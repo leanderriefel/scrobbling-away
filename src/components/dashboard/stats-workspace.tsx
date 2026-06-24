@@ -13,6 +13,7 @@ import {
 import { type CSSProperties, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ import {
   normalizeUsername,
   statsSnapshotsCollection,
   type LastFmPeriod,
+  type LastFmStatsSnapshot,
 } from "@/lib/lastfm-stats-cache";
 import {
   hydrateStatsSnapshotFromCache,
@@ -51,13 +53,25 @@ import { SyncBar } from "./sync-bar";
 import { ScrobbleExportBar } from "./scrobble-export-bar";
 import { ItemDetailOverlay } from "./item-detail-page";
 import { ItemDetailProvider } from "./item-detail-context";
+import { MarkovGraphOverlay } from "./markov-graph-overlay";
+import { MarkovGraphProvider } from "./markov-graph-context";
 import { UserHeader } from "./user-header";
 
 const LAST_USERNAME_KEY = "scrobbling-away:lastfm-username";
 
+function snapshotHasCachedData(snapshot: LastFmStatsSnapshot | undefined) {
+  return (
+    Boolean(snapshot?.profile) ||
+    (snapshot?.counts.recentTracks ?? 0) > 0 ||
+    (snapshot?.counts.friends ?? 0) > 0 ||
+    (snapshot?.counts.topArtists.overall ?? 0) > 0
+  );
+}
+
 export function StatsWorkspace() {
   const [username, setUsername] = useState("");
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [syncingUsername, setSyncingUsername] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<LastFmPeriod>("overall");
   const [isSyncing, setIsSyncing] = useState(false);
   const [exportState, setExportState] = useState<{
@@ -66,6 +80,8 @@ export function StatsWorkspace() {
   } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
+
+  const syncTarget = username.trim() || selectedUsername;
 
   const selectedUsernameLower = selectedUsername ? normalizeUsername(selectedUsername) : "";
   const snapshotQuery = useLiveQuery(
@@ -78,17 +94,43 @@ export function StatsWorkspace() {
     [selectedUsernameLower],
   );
   const snapshot = Array.isArray(snapshotQuery.data) ? snapshotQuery.data[0] : undefined;
-  const hasCachedData =
-    Boolean(snapshot?.profile) ||
-    (snapshot?.counts.recentTracks ?? 0) > 0 ||
-    (snapshot?.counts.friends ?? 0) > 0 ||
-    (snapshot?.counts.topArtists.overall ?? 0) > 0;
+
+  const syncTargetLower = syncTarget ? normalizeUsername(syncTarget) : "";
+  const syncTargetSnapshotQuery = useLiveQuery(
+    (query) =>
+      syncTargetLower
+        ? query
+            .from({ snapshot: statsSnapshotsCollection })
+            .where(({ snapshot }) => eq(snapshot.id, syncTargetLower))
+        : undefined,
+    [syncTargetLower],
+  );
+  const syncTargetSnapshot = Array.isArray(syncTargetSnapshotQuery.data)
+    ? syncTargetSnapshotQuery.data[0]
+    : undefined;
+
+  const syncingUsernameLower = syncingUsername ? normalizeUsername(syncingUsername) : "";
+  const syncingSnapshotQuery = useLiveQuery(
+    (query) =>
+      syncingUsernameLower && isSyncing
+        ? query
+            .from({ snapshot: statsSnapshotsCollection })
+            .where(({ snapshot }) => eq(snapshot.id, syncingUsernameLower))
+        : undefined,
+    [syncingUsernameLower, isSyncing],
+  );
+  const syncingSnapshot = Array.isArray(syncingSnapshotQuery.data)
+    ? syncingSnapshotQuery.data[0]
+    : undefined;
+
+  const syncBarSnapshot = isSyncing ? syncingSnapshot : syncTargetSnapshot;
+  const hasCachedData = snapshotHasCachedData(syncTargetSnapshot);
   const canResumeSync =
     !isSyncing &&
-    Boolean(selectedUsername) &&
-    (snapshot?.sync?.status === "stopped" ||
-      snapshot?.sync?.status === "error" ||
-      (snapshot && !hasCachedData));
+    Boolean(syncTarget) &&
+    (syncTargetSnapshot?.sync?.status === "stopped" ||
+      syncTargetSnapshot?.sync?.status === "error" ||
+      (syncTargetSnapshot && !hasCachedData));
 
   useEffect(() => {
     void statsSnapshotsCollection.preload();
@@ -118,9 +160,8 @@ export function StatsWorkspace() {
       return;
     }
 
-    window.localStorage.setItem(LAST_USERNAME_KEY, nextUsername);
-    setSelectedUsername(nextUsername);
     setIsSyncing(true);
+    setSyncingUsername(nextUsername);
     abortRef.current?.abort();
 
     const controller = new AbortController();
@@ -134,6 +175,8 @@ export function StatsWorkspace() {
         includeRecentTracks: true,
         signal: controller.signal,
       });
+      window.localStorage.setItem(LAST_USERNAME_KEY, nextUsername);
+      setSelectedUsername(nextUsername);
       toast.success(mode === "quick" ? "New scrobbles synced." : "Full sync complete.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
@@ -143,17 +186,18 @@ export function StatsWorkspace() {
       if (abortRef.current === controller) abortRef.current = null;
 
       setIsSyncing(false);
+      setSyncingUsername("");
     }
   };
 
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const mode: LastFmSyncMode = canResumeSync ? "deep" : hasCachedData ? "quick" : "deep";
-    void startSync(username.trim(), mode);
+    void startSync(syncTarget, mode);
   };
 
   const handleRefreshCache = async () => {
-    const nextUsername = selectedUsername || username.trim();
+    const nextUsername = syncTarget;
 
     if (!nextUsername) {
       toast.error("Enter a Last.fm username.");
@@ -166,14 +210,14 @@ export function StatsWorkspace() {
   };
 
   const handleExportScrobbles = async () => {
-    const nextUsername = selectedUsername || username.trim();
+    const nextUsername = syncTarget;
 
     if (!nextUsername) {
       toast.error("Enter a Last.fm username.");
       return;
     }
 
-    if ((snapshot?.counts.recentTracks ?? 0) === 0) {
+    if ((syncTargetSnapshot?.counts.recentTracks ?? 0) === 0) {
       toast.error("No scrobbles to export.");
       return;
     }
@@ -218,7 +262,7 @@ export function StatsWorkspace() {
   };
 
   const handleClearCache = async () => {
-    const nextUsername = selectedUsername || username.trim();
+    const nextUsername = syncTarget;
 
     if (!nextUsername) {
       toast.error("Enter a Last.fm username.");
@@ -227,8 +271,10 @@ export function StatsWorkspace() {
 
     abortRef.current?.abort();
     await clearCachedStatsForUser(nextUsername);
-    window.localStorage.removeItem(LAST_USERNAME_KEY);
-    setSelectedUsername("");
+    if (normalizeUsername(nextUsername) === selectedUsernameLower) {
+      window.localStorage.removeItem(LAST_USERNAME_KEY);
+      setSelectedUsername("");
+    }
     toast.success("Stats cleared.");
   };
 
@@ -236,185 +282,205 @@ export function StatsWorkspace() {
     <main>
       <div className="mx-auto flex w-full max-w-[960px] flex-col px-5 py-10">
         <ItemDetailProvider>
-          <Tabs defaultValue="stats">
-            <TabsList variant="line" className="mb-6">
-              <TabsTrigger value="stats">Your stats</TabsTrigger>
-              <TabsTrigger value="compare">Compare</TabsTrigger>
-            </TabsList>
-            <TabsContent value="stats" className="text-base/normal">
-              {/* Search + sync */}
-              <section className="animate-section-in motion-reduce:animate-none grid gap-4">
-                <form
-                  className="glass-panel mx-auto flex w-full max-w-md items-center gap-1.5 rounded-sm p-1 shadow-sm"
-                  onSubmit={handleSubmit}
-                >
-                  <Input
-                    className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-none focus-visible:ring-offset-0 pl-3 h-7 text-xs"
-                    placeholder="Last.fm username"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                  />
-                  {isSyncing ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-sm h-7 px-3.5 text-[11px]"
-                      onClick={() => abortRef.current?.abort()}
-                    >
-                      <SquareIcon className="size-3.5" />
-                      Stop
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      disabled={snapshotQuery.isLoading}
-                      className="rounded-sm h-7 px-4 text-[11px] font-medium"
-                    >
-                      {snapshotQuery.isLoading ? (
-                        <LoaderCircleIcon className="size-3.5 animate-spin" />
-                      ) : canResumeSync ? (
-                        <DownloadIcon className="size-3.5" />
-                      ) : hasCachedData ? (
-                        <ZapIcon className="size-3.5" />
-                      ) : (
-                        <DownloadIcon className="size-3.5" />
-                      )}
-                      <span className="ml-1">
-                        {canResumeSync ? "Resume" : hasCachedData ? "Quick sync" : "Sync"}
-                      </span>
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="rounded-sm size-7 shrink-0"
-                        />
-                      }
-                    >
-                      <MoreHorizontalIcon className="size-3.5" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel>Local data</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => void handleRefreshCache()}>
-                          <RefreshCcwIcon className="size-4" />
-                          Reload from IndexedDB
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!selectedUsername && !username.trim()}
-                          onClick={() =>
-                            void startSync(selectedUsername || username.trim(), "quick")
-                          }
-                        >
-                          <ZapIcon className="size-4" />
-                          Quick sync
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!selectedUsername && !username.trim()}
-                          onClick={() =>
-                            void startSync(selectedUsername || username.trim(), "deep")
-                          }
-                        >
-                          <ScanSearchIcon className="size-4" />
-                          Deep sync
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={
-                            exportState !== null ||
-                            (!selectedUsername && !username.trim()) ||
-                            (snapshot?.counts.recentTracks ?? 0) === 0
-                          }
-                          onClick={() => void handleExportScrobbles()}
-                        >
-                          <DownloadIcon className="size-4" />
-                          Download scrobbles (.csv)
-                        </DropdownMenuItem>
-                      </DropdownMenuGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={!selectedUsername && !username.trim()}
-                        onClick={() => void handleClearCache()}
-                      >
-                        <Trash2Icon className="size-4" />
-                        Clear this user
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </form>
-                {(isSyncing ||
-                  snapshotQuery.isLoading ||
-                  (snapshot?.sync &&
-                    snapshot.sync.status !== "complete" &&
-                    snapshot.sync.status !== "idle")) && (
-                  <div className="mx-auto w-full max-w-md">
-                    <SyncBar isLoading={isSyncing || snapshotQuery.isLoading} snapshot={snapshot} />
-                  </div>
-                )}
-                {exportState && (
-                  <div className="mx-auto w-full max-w-md">
-                    <ScrobbleExportBar
-                      rowsWritten={exportState.rowsWritten}
-                      bytesWritten={exportState.bytesWritten}
-                      onCancel={() => exportAbortRef.current?.abort()}
+          <MarkovGraphProvider>
+            <Tabs defaultValue="stats">
+              <TabsList variant="line" className="mb-6">
+                <TabsTrigger value="stats">Your stats</TabsTrigger>
+                <TabsTrigger value="compare">Compare</TabsTrigger>
+              </TabsList>
+              <TabsContent value="stats" className="text-base/normal">
+                {/* Search + sync */}
+                <section className="animate-section-in motion-reduce:animate-none grid gap-4">
+                  <form
+                    className="mx-auto flex w-full max-w-md items-center gap-1.5 rounded-lg border border-border/60 p-1"
+                    onSubmit={handleSubmit}
+                  >
+                    <Input
+                      className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-none focus-visible:ring-offset-0 pl-3 h-7 text-xs"
+                      placeholder="Last.fm username"
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                     />
+                    {isSyncing ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-7 px-3.5 text-[11px]"
+                        onClick={() => abortRef.current?.abort()}
+                      >
+                        <SquareIcon className="size-3.5" />
+                        Stop
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        disabled={!syncTarget || syncTargetSnapshotQuery.isLoading}
+                        className="h-7 px-4 text-[11px] font-medium"
+                      >
+                        {syncTargetSnapshotQuery.isLoading ? (
+                          <LoaderCircleIcon className="size-3.5 animate-spin" />
+                        ) : canResumeSync ? (
+                          <DownloadIcon className="size-3.5" />
+                        ) : hasCachedData ? (
+                          <ZapIcon className="size-3.5" />
+                        ) : (
+                          <DownloadIcon className="size-3.5" />
+                        )}
+                        <span className="ml-1">
+                          {canResumeSync ? "Resume" : hasCachedData ? "Quick sync" : "Sync"}
+                        </span>
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-7 shrink-0"
+                          />
+                        }
+                      >
+                        <MoreHorizontalIcon className="size-3.5" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Local data</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => void handleRefreshCache()}>
+                            <RefreshCcwIcon className="size-4" />
+                            Reload from IndexedDB
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!syncTarget}
+                            onClick={() => void startSync(syncTarget, "quick")}
+                          >
+                            <ZapIcon className="size-4" />
+                            Quick sync
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!syncTarget}
+                            onClick={() => void startSync(syncTarget, "deep")}
+                          >
+                            <ScanSearchIcon className="size-4" />
+                            Deep sync
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              exportState !== null ||
+                              !syncTarget ||
+                              (syncTargetSnapshot?.counts.recentTracks ?? 0) === 0
+                            }
+                            onClick={() => void handleExportScrobbles()}
+                          >
+                            <DownloadIcon className="size-4" />
+                            Download scrobbles (.csv)
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={!syncTarget}
+                          onClick={() => void handleClearCache()}
+                        >
+                          <Trash2Icon className="size-4" />
+                          Clear this user
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </form>
+                  {(isSyncing ||
+                    syncTargetSnapshotQuery.isLoading ||
+                    (syncBarSnapshot?.sync &&
+                      syncBarSnapshot.sync.status !== "complete" &&
+                      syncBarSnapshot.sync.status !== "idle")) && (
+                    <div className="mx-auto w-full max-w-md rounded-md">
+                      <SyncBar
+                        isLoading={
+                          isSyncing ||
+                          syncTargetSnapshotQuery.isLoading ||
+                          syncingSnapshotQuery.isLoading
+                        }
+                        snapshot={syncBarSnapshot}
+                      />
+                    </div>
+                  )}
+                  {exportState && (
+                    <div className="mx-auto w-full max-w-md rounded-md">
+                      <ScrobbleExportBar
+                        rowsWritten={exportState.rowsWritten}
+                        bytesWritten={exportState.bytesWritten}
+                        onCancel={() => exportAbortRef.current?.abort()}
+                      />
+                    </div>
+                  )}
+                  {syncTargetSnapshot && (
+                    <div className="mx-auto flex w-full max-w-md flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-border/60 px-4 py-1.5 text-[11px] text-muted-foreground/80">
+                      <DatabaseIcon className="size-3 text-muted-foreground/60" />
+                      <span>
+                        {syncTargetSnapshot.counts.recentTracks.toLocaleString()} scrobbles
+                      </span>
+                      <span className="h-full w-px bg-border/60" />
+                      <span>
+                        {syncTargetSnapshot.counts.topArtists.overall.toLocaleString()} ranked
+                        artists
+                      </span>
+                      <span className="h-full w-px bg-border/60" />
+                      <span>{syncTargetSnapshot.counts.friends.toLocaleString()} friends</span>
+                      <span className="h-full w-px bg-border/60" />
+                      <span>Updated {formatRelativeTime(syncTargetSnapshot.updatedAt)}</span>
+                    </div>
+                  )}
+                </section>
+
+                {/* Loading state */}
+                {selectedUsername && !snapshot && (
+                  <div className="animate-section-in motion-reduce:animate-none flex w-full max-w-md flex-col rounded-md items-center py-20 text-center">
+                    <LoaderCircleIcon className="size-6 animate-spin text-muted-foreground" />
+                    <p className="mt-4 text-sm text-muted-foreground">Loading your music…</p>
                   </div>
                 )}
+
+                {/* Dashboard */}
                 {snapshot && (
-                  <div className="glass-panel mx-auto flex w-fit flex-wrap items-center gap-x-3 gap-y-1 rounded-sm px-4 py-1.5 text-[11px] text-muted-foreground/80">
-                    <DatabaseIcon className="size-3 text-muted-foreground/60" />
-                    <span>{snapshot.counts.recentTracks.toLocaleString()} scrobbles</span>
-                    <span className="h-2 w-px bg-border/60" />
-                    <span>
-                      {snapshot.counts.topArtists.overall.toLocaleString()} ranked artists
-                    </span>
-                    <span className="h-2 w-px bg-border/60" />
-                    <span>{snapshot.counts.friends.toLocaleString()} friends</span>
-                    <span className="h-2 w-px bg-border/60" />
-                    <span>Updated {formatRelativeTime(snapshot.updatedAt)}</span>
-                  </div>
+                  <DashboardProvider
+                    snapshot={snapshot}
+                    selectedPeriod={selectedPeriod}
+                    setSelectedPeriod={setSelectedPeriod}
+                  >
+                    <Dashboard />
+                    <MarkovGraphOverlay />
+                  </DashboardProvider>
                 )}
-              </section>
-
-              {/* Loading state */}
-              {selectedUsername && !snapshot && (
-                <div className="animate-section-in motion-reduce:animate-none flex flex-col items-center py-20 text-center">
-                  <LoaderCircleIcon className="size-6 animate-spin text-muted-foreground" />
-                  <p className="mt-4 text-sm text-muted-foreground">Loading your music…</p>
-                </div>
-              )}
-
-              {/* Dashboard */}
-              {snapshot && (
-                <DashboardProvider
-                  snapshot={snapshot}
-                  selectedPeriod={selectedPeriod}
-                  setSelectedPeriod={setSelectedPeriod}
-                >
-                  <Dashboard />
-                </DashboardProvider>
-              )}
-            </TabsContent>
-            <TabsContent value="compare" className="text-base/normal">
-              <CompareWorkspace />
-            </TabsContent>
-          </Tabs>
-          <ItemDetailOverlay />
+              </TabsContent>
+              <TabsContent value="compare" className="text-base/normal">
+                <CompareWorkspace />
+              </TabsContent>
+            </Tabs>
+            <ItemDetailOverlay />
+          </MarkovGraphProvider>
         </ItemDetailProvider>
       </div>
     </main>
   );
 }
 
-function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+function AnimatedSection({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
   return (
     <section
-      className="animate-section-in motion-reduce:animate-none"
+      className={cn(
+        "animate-section-in motion-reduce:animate-none border-t border-border/40 pt-10",
+        className,
+      )}
       style={{ animationDelay: `${delay}ms` } as CSSProperties}
     >
       {children}
@@ -424,8 +490,8 @@ function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; d
 
 function Dashboard() {
   return (
-    <div className="mt-8 grid gap-16 pb-12">
-      <AnimatedSection delay={0}>
+    <div className="mt-6 pb-10">
+      <AnimatedSection className="border-t-0 pt-0" delay={0}>
         <UserHeader />
       </AnimatedSection>
 

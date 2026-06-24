@@ -1,4 +1,5 @@
 import type { ListeningSessionStats, SessionBucket } from "@/lib/listening-analytics";
+import { formatListeningSessionGap } from "@/lib/listening-sessions";
 import { chartOpacityFromCount } from "@/utils/chart-intensity";
 import { formatCompact, formatNumber, formatPercent } from "@/utils/format";
 
@@ -9,16 +10,16 @@ import { formatMinutes, oneDecimalFormatter } from "./formatters";
 import { Metric } from "./metric";
 
 export function ListeningSessions({ analytics }: { analytics: ListeningSessionStats }) {
+  const gapLabel = formatListeningSessionGap(analytics.gapSeconds);
+  const sessionGroupingHelp = `Scrobbles stay in one session until you go ${gapLabel} without a play. Tuned from your listening pauses.`;
+
   return (
-    <AnalyticsPanel
-      title="Listening sessions"
-      description="A group of scrobbles separated by less than 45 minutes."
-    >
+    <AnalyticsPanel title="Listening sessions" description={sessionGroupingHelp}>
       <div className="grid grid-cols-2 gap-4">
         <Metric
           label="Sessions"
           value={formatNumber(analytics.totalSessions)}
-          help="A group of scrobbles separated by less than 45 minutes."
+          help={sessionGroupingHelp}
         />
         <Metric
           label="Avg duration"
@@ -57,11 +58,11 @@ function DurationBuckets({ buckets }: { buckets: SessionBucket[] }) {
           <Tooltip>
             <TooltipTrigger
               render={
-                <div className="h-1.5 overflow-hidden rounded-sm bg-chart-track" tabIndex={0} />
+                <div className="h-1.5 overflow-hidden rounded-md bg-chart-track" tabIndex={0} />
               }
             >
               <div
-                className="h-full rounded-sm bg-chart-1 transition-opacity duration-200 hover:opacity-100"
+                className="h-full rounded-md bg-chart-1 transition-opacity duration-200 hover:opacity-100"
                 style={{
                   width: `${(bucket.count / max) * 100}%`,
                   opacity: chartOpacityFromCount(bucket.count, max),

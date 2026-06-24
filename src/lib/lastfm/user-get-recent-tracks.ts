@@ -5,6 +5,7 @@ import {
   lastFmArtistSchema,
   lastFmDateSchema,
   lastFmImageSchema,
+  lastFmListSchema,
   lastFmPaginatedMetaSchema,
   lastFmStreamableSchema,
   type LastFmRequester,
@@ -58,7 +59,7 @@ export const lastFmTrackSchema = z
 
 export const getRecentTracksResponseSchema = z.object({
   recenttracks: z.object({
-    track: z.array(lastFmTrackSchema),
+    track: lastFmListSchema(lastFmTrackSchema),
     "@attr": lastFmPaginatedMetaSchema,
   }),
 });

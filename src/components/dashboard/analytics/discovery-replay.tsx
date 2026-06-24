@@ -64,7 +64,7 @@ function StackedReplayBars({ months }: { months: DiscoveryReplayMonth[] }) {
             <TooltipTrigger
               render={
                 <div
-                  className="flex h-full min-w-2 flex-1 flex-col justify-end overflow-hidden rounded-sm bg-chart-track outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100 focus-visible:ring-2"
+                  className="flex h-full min-w-2 flex-1 flex-col justify-end overflow-hidden rounded-md bg-chart-track outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100 focus-visible:ring-2"
                   style={{ opacity: chartOpacityFromCount(month.total, maxTotal) }}
                   tabIndex={0}
                 />

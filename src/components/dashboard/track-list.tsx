@@ -58,11 +58,11 @@ function TrackRow({
         <img
           src={item.imageUrl}
           alt=""
-          className="size-9 shrink-0 rounded object-cover"
+          className="size-9 shrink-0 rounded-md object-cover"
           loading="lazy"
         />
       ) : (
-        <span className="grid size-9 shrink-0 place-items-center rounded bg-muted/60">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted/50">
           <Music2Icon className="size-3.5 text-muted-foreground/50" />
         </span>
       )}
@@ -81,7 +81,7 @@ function TrackRow({
   );
 
   const className =
-    "group relative flex min-w-0 items-center gap-3 rounded-sm px-2 py-2 transition-all duration-300 ease-out hover:bg-accent/40 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-full before:bg-primary before:opacity-0 before:transition-all before:duration-300 hover:before:opacity-100 hover:pl-3";
+    "group flex min-w-0 items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40";
 
   if (onItemClick) {
     return (

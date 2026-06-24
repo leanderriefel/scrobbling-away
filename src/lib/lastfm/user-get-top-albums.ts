@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   lastFmArtistSchema,
   lastFmImageSchema,
+  lastFmListSchema,
   lastFmPeriodPaginatedMetaSchema,
   lastFmPeriodSchema,
   type LastFmRequester,
@@ -44,7 +45,7 @@ const lastFmTopAlbumSchema = z
 
 export const getTopAlbumsResponseSchema = z.object({
   topalbums: z.object({
-    album: z.array(lastFmTopAlbumSchema),
+    album: lastFmListSchema(lastFmTopAlbumSchema),
     "@attr": topAlbumsMetaSchema,
   }),
 });

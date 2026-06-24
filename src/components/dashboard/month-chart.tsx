@@ -48,13 +48,13 @@ export const MonthChart = ({
               <TooltipTrigger
                 render={
                   <div
-                    className="h-[5px] overflow-hidden rounded-sm bg-chart-track outline-none"
+                    className="h-[5px] overflow-hidden rounded-md bg-chart-track outline-none"
                     tabIndex={0}
                   />
                 }
               >
                 <div
-                  className="animate-bar-grow origin-bottom motion-reduce:animate-none h-full rounded-sm bg-chart-1 transition-opacity duration-200 hover:opacity-100"
+                  className="animate-bar-grow origin-bottom motion-reduce:animate-none h-full rounded-md bg-chart-1 transition-opacity duration-200 hover:opacity-100"
                   style={{
                     width: `${Math.max(2, ratio * 100)}%`,
                     opacity: chartOpacityFromCount(bucket.count, max),
@@ -81,7 +81,10 @@ export const MonthChart = ({
 
   return (
     <div className="grid min-w-0 gap-5">
-      <SectionTitle description="Scrobbles grouped by calendar month (all years combined).">
+      <SectionTitle
+        variant="subsection"
+        description="Scrobbles grouped by calendar month (all years combined)."
+      >
         By month
       </SectionTitle>
       {chart}

@@ -40,7 +40,7 @@ const lastFmTopArtistSchema = z
     url: artist.url,
     streamable: artist.streamable?.streamable,
     fullTrack: artist.streamable?.fullTrack,
-    images: artist.image ?? [],
+    images: [] as Array<{ "#text": string; size: string }>,
   }));
 
 export const getTopArtistsResponseSchema = z.object({

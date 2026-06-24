@@ -13,9 +13,11 @@ import {
   type UserInfo,
 } from "@/lib/lastfm";
 import Dexie from "dexie";
+import { env } from "@/env/web";
 import {
   LASTFM_PERIODS,
   createCachedFriend,
+  getImageUrl,
   createCachedRecentTrack,
   createCachedTopAlbum,
   createCachedTopArtist,
@@ -33,8 +35,11 @@ import {
   type LastFmPeriod,
   type LastFmStatsSnapshot,
   type LastFmSyncMeta,
+  type LastFmSyncMode,
   type LastFmSyncPhase,
 } from "@/lib/lastfm-stats-cache";
+
+export type { LastFmSyncMode };
 
 const PAGE_LIMIT = 200;
 const MAX_RECENT_PAGES_PER_WINDOW = 20;
@@ -43,8 +48,8 @@ const MIN_RECENT_WINDOW_SECONDS = 24 * 60 * 60;
 const LASTFM_EPOCH_SECONDS = Math.floor(new Date("2002-03-20T00:00:00Z").getTime() / 1000);
 const MAX_LASTFM_RETRIES = 4;
 const LASTFM_RETRY_BASE_MS = 1_000;
-
 export type LastFmStatsSyncOptions = {
+  mode?: LastFmSyncMode;
   includeRecentTracks?: boolean;
   onProgress?: (progress: LastFmSyncMeta) => void;
   onSnapshot?: (snapshot: LastFmStatsSnapshot) => void;
@@ -81,7 +86,13 @@ export const hydrateStatsSnapshotFromCache = async (username: string) => {
 
 export const syncLastFmStats = async (
   usernameInput: string,
-  { includeRecentTracks = true, onProgress, onSnapshot, signal }: LastFmStatsSyncOptions = {},
+  {
+    mode = "deep",
+    includeRecentTracks = true,
+    onProgress,
+    onSnapshot,
+    signal,
+  }: LastFmStatsSyncOptions = {},
 ) => {
   const username = usernameInput.trim();
   const usernameLower = normalizeUsername(username);
@@ -91,7 +102,8 @@ export const syncLastFmStats = async (
       usernameLower,
       status: "running",
       phase: "idle",
-      message: "Preparing sync",
+      mode,
+      message: mode === "quick" ? "Preparing quick sync" : "Preparing deep sync",
       fetched: 0,
       updatedAt: new Date().toISOString(),
     },
@@ -116,19 +128,28 @@ export const syncLastFmStats = async (
   try {
     const profile = await syncProfile(context);
     await publishSnapshot(context, onSnapshot);
-    await syncFriends(context);
-    await publishSnapshot(context, onSnapshot);
-    await syncTopArtists(context);
-    await publishSnapshot(context, onSnapshot);
-    await syncTopAlbums(context);
-    await publishSnapshot(context, onSnapshot);
-    await syncTopTracks(context);
-    await publishSnapshot(context, onSnapshot);
 
-    if (includeRecentTracks) {
-      await syncRecentTrackHistory(context, profile);
+    if (mode === "deep") {
+      await syncFriends(context);
+      await publishSnapshot(context, onSnapshot);
+      await syncTopArtists(context);
+      await publishSnapshot(context, onSnapshot);
+      await syncTopAlbums(context);
+      await publishSnapshot(context, onSnapshot);
+      await syncTopTracks(context);
       await publishSnapshot(context, onSnapshot);
     }
+
+    if (includeRecentTracks) {
+      if (mode === "quick") {
+        await syncRecentTrackHistoryQuick(context, profile);
+      } else {
+        await syncRecentTrackHistoryDeep(context, profile);
+      }
+      await publishSnapshot(context, onSnapshot);
+    }
+
+    await resolveMissingImages(context);
 
     await emitProgress(context, {
       phase: "snapshot",
@@ -343,7 +364,7 @@ const syncTopPeriod = async <TItem>(
   });
 };
 
-const syncRecentTrackHistory = async (context: SyncContext, profile: UserInfo) => {
+const syncRecentTrackHistoryQuick = async (context: SyncContext, profile: UserInfo) => {
   const registeredAt = profile.registered?.timestamp ?? LASTFM_EPOCH_SECONDS;
   const to = Math.floor(Date.now() / 1000);
   const cacheState = await getRecentTrackCacheState(context.usernameLower);
@@ -359,7 +380,7 @@ const syncRecentTrackHistory = async (context: SyncContext, profile: UserInfo) =
     phase: "recent-tracks",
     message:
       cacheState.count > 0
-        ? `Continuing from ${cacheState.count.toLocaleString()} scrobbles`
+        ? `Fetching scrobbles after ${cacheState.count.toLocaleString()} saved`
         : "Walking full scrobble history",
     fetched: cacheState.count,
     total: playcount,
@@ -367,11 +388,66 @@ const syncRecentTrackHistory = async (context: SyncContext, profile: UserInfo) =
 
   if (remaining > 0 && from < to) {
     await syncRecentRange(context, { from, to }, saved, 0);
+  } else if (cacheState.count > 0) {
+    await emitProgress(context, {
+      message: "Already up to date",
+      fetched: cacheState.count,
+      total: playcount,
+    });
+    return;
   }
 
   await emitProgress(context, {
     message: `${saved.count.toLocaleString()} scrobbles saved`,
     fetched: saved.count,
+    total: playcount,
+  });
+};
+
+const syncRecentTrackHistoryDeep = async (context: SyncContext, profile: UserInfo) => {
+  const registeredAt = profile.registered?.timestamp ?? LASTFM_EPOCH_SECONDS;
+  const to = Math.floor(Date.now() / 1000);
+  const cacheState = await getRecentTrackCacheState(context.usernameLower);
+  const playcount = profile.playcount ?? cacheState.count;
+  const saved = { count: 0 };
+  const remoteIds = new Set<string>();
+
+  await emitProgress(context, {
+    phase: "recent-tracks",
+    message: "Re-fetching full scrobble history",
+    fetched: 0,
+    total: playcount,
+  });
+
+  await syncRecentRange(context, { from: registeredAt, to }, saved, 0, remoteIds);
+
+  await emitProgress(context, {
+    phase: "reconcile",
+    message: "Checking for removed or edited scrobbles",
+    fetched: saved.count,
+    total: playcount,
+  });
+
+  const localTracks = await lastFmStatsDb.recentTracks
+    .where("usernameLower")
+    .equals(context.usernameLower)
+    .toArray();
+  const orphanedIds = localTracks
+    .filter((track) => !remoteIds.has(track.id))
+    .map((track) => track.id);
+
+  if (orphanedIds.length > 0) {
+    await lastFmStatsDb.recentTracks.bulkDelete(orphanedIds);
+  }
+
+  const verifiedCount = remoteIds.size;
+
+  await emitProgress(context, {
+    message:
+      orphanedIds.length > 0
+        ? `Verified ${verifiedCount.toLocaleString()} scrobbles, removed ${orphanedIds.length.toLocaleString()} outdated`
+        : `${verifiedCount.toLocaleString()} scrobbles verified`,
+    fetched: verifiedCount,
     total: playcount,
   });
 };
@@ -397,6 +473,7 @@ const syncRecentRange = async (
   range: RecentRange,
   saved: { count: number },
   depth: number,
+  collectedIds?: Set<string>,
 ) => {
   throwIfAborted(context.signal);
 
@@ -415,12 +492,24 @@ const syncRecentRange = async (
   ) {
     const midpoint = Math.floor(range.from + windowSeconds / 2);
 
-    await syncRecentRange(context, { from: range.from, to: midpoint }, saved, depth + 1);
-    await syncRecentRange(context, { from: midpoint + 1, to: range.to }, saved, depth + 1);
+    await syncRecentRange(
+      context,
+      { from: range.from, to: midpoint },
+      saved,
+      depth + 1,
+      collectedIds,
+    );
+    await syncRecentRange(
+      context,
+      { from: midpoint + 1, to: range.to },
+      saved,
+      depth + 1,
+      collectedIds,
+    );
     return;
   }
 
-  await cacheRecentTracks(context, firstPage.items, saved);
+  await cacheRecentTracks(context, firstPage.items, saved, collectedIds);
 
   const pages = Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => index + 2);
 
@@ -434,11 +523,14 @@ const syncRecentRange = async (
       context,
       responses.flatMap((response) => response.items),
       saved,
+      collectedIds,
     );
     await emitProgress(context, {
       phase: "recent-tracks",
-      message: `${saved.count.toLocaleString()} scrobbles saved`,
-      fetched: saved.count,
+      message: collectedIds
+        ? `${collectedIds.size.toLocaleString()} scrobbles verified`
+        : `${saved.count.toLocaleString()} scrobbles saved`,
+      fetched: collectedIds ? collectedIds.size : saved.count,
       total: context.current.total,
     });
   }
@@ -469,6 +561,7 @@ const cacheRecentTracks = async (
   context: SyncContext,
   tracks: RecentTrack[],
   saved: { count: number },
+  collectedIds?: Set<string>,
 ) => {
   const fetchedAt = new Date().toISOString();
   const rows = tracks
@@ -480,7 +573,14 @@ const cacheRecentTracks = async (
   }
 
   await lastFmStatsDb.recentTracks.bulkPut(rows);
-  saved.count += rows.length;
+
+  if (collectedIds) {
+    for (const row of rows) {
+      collectedIds.add(row.id);
+    }
+  } else {
+    saved.count += rows.length;
+  }
 };
 
 const fetchPaginated = async <TItem>(
@@ -618,4 +718,327 @@ const isRetryableLastFmError = (error: unknown) => {
   return /fetch|network|operation failed|rate limit|status 429|status 5|timeout|try again/i.test(
     error.message,
   );
+};
+
+const isValidImage = (images: Array<{ "#text": string; size: string }> | undefined) => {
+  const url = getImageUrl(images);
+  if (!url) return false;
+  return !url.includes("2a96cbd") && !url.includes("placeholder_") && !url.includes("default_");
+};
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchArtistWikidataId = async (mbid: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(
+      `https://musicbrainz.org/ws/2/artist/${mbid}?inc=url-rels&fmt=json`,
+      {
+        headers: {
+          "User-Agent": "ScrobblingAway/1.0.0 (https://github.com/leanderriefel/scrobbling-away)",
+        },
+      },
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const relations = data.relations || [];
+      const wikidataRelation = relations.find(
+        (rel: any) =>
+          rel.type === "wikidata" ||
+          (rel.url && rel.url.resource && rel.url.resource.includes("wikidata.org/wiki/")),
+      );
+      if (wikidataRelation?.url?.resource) {
+        const urlStr = wikidataRelation.url.resource;
+        const match = urlStr.match(/\/entity\/(Q[0-9]+)/) || urlStr.match(/\/wiki\/(Q[0-9]+)/);
+        if (match) {
+          return match[1];
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to fetch MusicBrainz artist for mbid ${mbid}:`, e);
+  }
+  return undefined;
+};
+
+const fetchWikidataImageFilename = async (wikidataId: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(
+      `https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${wikidataId}&property=P18&format=json&origin=*`,
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const claims = data.claims?.P18 || [];
+      const filename = claims[0]?.mainsnak?.datavalue?.value;
+      if (typeof filename === "string") {
+        return filename;
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to fetch Wikidata claims for ${wikidataId}:`, e);
+  }
+  return undefined;
+};
+
+const fetchWikimediaImageUrl = async (filename: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(
+      `https://commons.wikimedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(filename)}&prop=imageinfo&iiprop=url&format=json&origin=*`,
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const pages = data.query?.pages || {};
+      const pageId = Object.keys(pages)[0];
+      if (pageId) {
+        const imageUrl = pages[pageId]?.imageinfo?.[0]?.url;
+        if (imageUrl) {
+          return imageUrl;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to fetch Wikimedia image URL for ${filename}:`, e);
+  }
+  return undefined;
+};
+
+const fetchArtistImageFromWikimedia = async (mbid: string): Promise<string | undefined> => {
+  const wikidataId = await fetchArtistWikidataId(mbid);
+  if (!wikidataId) return undefined;
+
+  const filename = await fetchWikidataImageFilename(wikidataId);
+  if (!filename) return undefined;
+
+  return await fetchWikimediaImageUrl(filename);
+};
+
+const fetchTrackAlbumImage = async (
+  name: string,
+  artistName: string,
+): Promise<string | undefined> => {
+  try {
+    const url = new URL("https://ws.audioscrobbler.com/2.0/");
+    url.searchParams.set("method", "track.getInfo");
+    url.searchParams.set("api_key", env.VITE_LASTFM_KEY);
+    url.searchParams.set("artist", artistName);
+    url.searchParams.set("track", name);
+    url.searchParams.set("format", "json");
+
+    const response = await fetch(url.toString());
+    if (response.ok) {
+      const data = await response.json();
+      const images = data.track?.album?.image;
+      if (images) {
+        return getImageUrl(images);
+      }
+    }
+  } catch (e) {
+    console.error(`Failed to fetch track info from Last.fm for "${name}" by "${artistName}":`, e);
+  }
+  return undefined;
+};
+
+const resolveArtistImages = async (context: SyncContext) => {
+  const topArtists = await lastFmStatsDb.topArtists
+    .where("usernameLower")
+    .equals(context.usernameLower)
+    .toArray();
+
+  const missingArtistsMap = new Map<
+    string,
+    { name: string; mbid?: string; bestRank: number; key: string }
+  >();
+  for (const item of topArtists) {
+    const artist = item.artist;
+    if (artist && !isValidImage(artist.images)) {
+      const artistName = (artist.name as string) || "";
+      const key = artist.mbid || artistName.toLowerCase().trim();
+      const existing = missingArtistsMap.get(key);
+      const rank = item.rank || 200;
+      if (!existing || rank < existing.bestRank) {
+        missingArtistsMap.set(key, {
+          name: artistName,
+          mbid: artist.mbid,
+          bestRank: rank,
+          key,
+        });
+      }
+    }
+  }
+
+  const missingArtists = Array.from(missingArtistsMap.values());
+  if (missingArtists.length === 0) return;
+
+  missingArtists.sort((a, b) => a.bestRank - b.bestRank);
+
+  const maxArtistsToResolve = 50;
+  const toResolve = missingArtists.slice(0, maxArtistsToResolve);
+
+  for (let i = 0; i < toResolve.length; i++) {
+    throwIfAborted(context.signal);
+    const artist = toResolve[i];
+    if (artist && artist.mbid) {
+      await emitProgress(context, {
+        message: `Resolving artist images from MusicBrainz (${i + 1}/${toResolve.length}): ${artist.name}`,
+      });
+
+      if (i > 0) {
+        await delay(1000);
+      }
+
+      const imageUrl = await fetchArtistImageFromWikimedia(artist.mbid);
+      if (imageUrl) {
+        await lastFmStatsDb.transaction("rw", lastFmStatsDb.topArtists, async () => {
+          const matchingItems = topArtists.filter((item) => {
+            const itemArtist = item.artist;
+            if (!itemArtist) return false;
+            const itemArtistName = (itemArtist.name as string) || "";
+            const itemKey = itemArtist.mbid || itemArtistName.toLowerCase().trim();
+            return itemKey === artist.key;
+          });
+          for (const item of matchingItems) {
+            if (item.artist) {
+              item.artist.images = [{ "#text": imageUrl, size: "extralarge" }];
+              await lastFmStatsDb.topArtists.put(item);
+            }
+          }
+        });
+      }
+    }
+  }
+};
+
+const resolveTrackImages = async (context: SyncContext) => {
+  const topTracks = await lastFmStatsDb.topTracks
+    .where("usernameLower")
+    .equals(context.usernameLower)
+    .toArray();
+
+  const missingTracksMap = new Map<
+    string,
+    { name: string; artistName: string; bestRank: number; key: string }
+  >();
+  for (const item of topTracks) {
+    const track = item.track;
+    if (track && !isValidImage(track.images)) {
+      const artistName = (track.artist.name as string) || "";
+      const key = `${artistName.toLowerCase().trim()}:${track.name.toLowerCase().trim()}`;
+      const existing = missingTracksMap.get(key);
+      const rank = item.rank || 200;
+      if (!existing || rank < existing.bestRank) {
+        missingTracksMap.set(key, {
+          name: track.name,
+          artistName,
+          bestRank: rank,
+          key,
+        });
+      }
+    }
+  }
+
+  const missingTracks = Array.from(missingTracksMap.values());
+  if (missingTracks.length === 0) return;
+
+  missingTracks.sort((a, b) => a.bestRank - b.bestRank);
+
+  const maxTracksToResolve = 50;
+  const toResolve = missingTracks.slice(0, maxTracksToResolve);
+
+  for (let i = 0; i < toResolve.length; i++) {
+    throwIfAborted(context.signal);
+    const track = toResolve[i];
+    if (track) {
+      await emitProgress(context, {
+        message: `Resolving track album covers from Last.fm (${i + 1}/${toResolve.length}): ${track.name}`,
+      });
+
+      if (i > 0) {
+        await delay(150);
+      }
+
+      const imageUrl = await fetchTrackAlbumImage(track.name, track.artistName);
+      if (imageUrl) {
+        await lastFmStatsDb.transaction("rw", lastFmStatsDb.topTracks, async () => {
+          const matchingItems = topTracks.filter((item) => {
+            const itemTrack = item.track;
+            if (!itemTrack) return false;
+            const artistName = (itemTrack.artist.name as string) || "";
+            const key = `${artistName.toLowerCase().trim()}:${itemTrack.name.toLowerCase().trim()}`;
+            return key === track.key;
+          });
+          for (const item of matchingItems) {
+            if (item.track) {
+              item.track.images = [{ "#text": imageUrl, size: "extralarge" }];
+              await lastFmStatsDb.topTracks.put(item);
+            }
+          }
+        });
+      }
+    }
+  }
+};
+
+const resolveRecentTrackImages = async (context: SyncContext) => {
+  const recentTracks = await lastFmStatsDb.recentTracks
+    .where("usernameLower")
+    .equals(context.usernameLower)
+    .reverse()
+    .limit(30)
+    .toArray();
+
+  const missingTracksMap = new Map<string, { name: string; artistName: string; key: string }>();
+  for (const item of recentTracks) {
+    const track = item.track;
+    if (track && !isValidImage(track.images)) {
+      const key = `${item.artistName.toLowerCase().trim()}:${item.trackName.toLowerCase().trim()}`;
+      missingTracksMap.set(key, { name: item.trackName, artistName: item.artistName, key });
+    }
+  }
+
+  const missingTracks = Array.from(missingTracksMap.values());
+  if (missingTracks.length === 0) return;
+
+  for (let i = 0; i < missingTracks.length; i++) {
+    throwIfAborted(context.signal);
+    const track = missingTracks[i];
+    if (track) {
+      await emitProgress(context, {
+        message: `Resolving recent play album covers from Last.fm (${i + 1}/${missingTracks.length}): ${track.name}`,
+      });
+
+      if (i > 0) {
+        await delay(150);
+      }
+
+      const imageUrl = await fetchTrackAlbumImage(track.name, track.artistName);
+      if (imageUrl) {
+        await lastFmStatsDb.transaction("rw", lastFmStatsDb.recentTracks, async () => {
+          const matchingItems = recentTracks.filter((item) => {
+            const key = `${item.artistName.toLowerCase().trim()}:${item.trackName.toLowerCase().trim()}`;
+            return key === track.key;
+          });
+          for (const item of matchingItems) {
+            if (item.track) {
+              item.track.images = [{ "#text": imageUrl, size: "extralarge" }];
+              await lastFmStatsDb.recentTracks.put(item);
+            }
+          }
+        });
+      }
+    }
+  }
+};
+
+const resolveMissingImages = async (context: SyncContext) => {
+  throwIfAborted(context.signal);
+  await emitProgress(context, {
+    message: "Resolving missing artist and track images",
+  });
+
+  try {
+    await resolveArtistImages(context);
+    await resolveTrackImages(context);
+    await resolveRecentTrackImages(context);
+  } catch (error) {
+    console.error("Failed to resolve missing images:", error);
+  }
 };

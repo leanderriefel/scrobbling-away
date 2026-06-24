@@ -71,15 +71,31 @@ export const requestLastFm = async (
   searchParams.set("format", "json");
 
   const response = await fetcher(`${LASTFM_API_URL}?${searchParams.toString()}`);
-  const json: unknown = await response.json();
+
+  if (!response.ok) {
+    let errorMessage = `Last.fm request failed with status ${response.status}`;
+    try {
+      const json: unknown = await response.json();
+      const lastFmError = lastFmErrorSchema.safeParse(json);
+      if (lastFmError.success) {
+        errorMessage = lastFmError.data.message;
+      }
+    } catch {
+      // Not a JSON response (e.g. HTML 500 error page)
+    }
+    throw new Error(errorMessage);
+  }
+
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    throw new Error(`Failed to parse Last.fm JSON response (status ${response.status})`);
+  }
+
   const lastFmError = lastFmErrorSchema.safeParse(json);
-
-  if (!response.ok || lastFmError.success) {
-    const message = lastFmError.success
-      ? lastFmError.data.message
-      : `Last.fm request failed with status ${response.status}`;
-
-    throw new Error(message);
+  if (lastFmError.success) {
+    throw new Error(lastFmError.data.message);
   }
 
   return json;

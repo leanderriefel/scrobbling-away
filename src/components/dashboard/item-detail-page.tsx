@@ -198,11 +198,11 @@ const getHeaderMeta = (selection: ItemDetailSelection) => {
 };
 
 const StatCard = ({ help, label, value }: { help?: string; label: string; value: string }) => (
-  <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+  <div className="relative pl-4 py-2 border-l border-primary/20 transition-all duration-300 hover:border-primary/60">
+    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 font-medium">
       <span>{label}</span>
       {help ? <HelpTooltip>{help}</HelpTooltip> : null}
     </div>
-    <div className="mt-1 font-mono text-sm font-semibold tabular-nums">{value}</div>
+    <div className="mt-1 font-mono text-base font-light tabular-nums metallic-text">{value}</div>
   </div>
 );

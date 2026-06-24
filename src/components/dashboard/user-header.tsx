@@ -22,8 +22,8 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
 
   return (
     <div className="grid gap-8">
-      <div className={cn("flex min-w-0 items-center", isCompare ? "gap-4" : "gap-5")}>
-        <Avatar size="lg" className="ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+      <div className={cn("flex min-w-0 items-center", isCompare ? "gap-6" : "gap-8")}>
+        <Avatar size="lg" className="shimmer-ring">
           {profileImage && <AvatarImage src={profileImage} alt="" />}
           <AvatarFallback>{displayName.slice(0, 2)}</AvatarFallback>
         </Avatar>
@@ -39,7 +39,7 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
 
       <div
         className={cn(
-          "grid gap-x-8 gap-y-6",
+          "grid gap-x-10 gap-y-8",
           isCompare ? "grid-cols-2 md:grid-cols-2" : "grid-cols-2 sm:grid-cols-4",
         )}
       >
@@ -47,7 +47,6 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
           label="Plays"
           value={formatNumber(snapshot.profile?.playcount ?? 0)}
           help="Total scrobbles reported by Last.fm."
-          highlight
           showHelp={!isCompare}
         />
         <StatBlock
@@ -75,13 +74,11 @@ export const UserHeader = ({ variant = "default" }: UserHeaderProps = {}) => {
 
 const StatBlock = ({
   help,
-  highlight,
   label,
   showHelp = true,
   value,
 }: {
   help: string;
-  highlight?: boolean;
   label: string;
   showHelp?: boolean;
   value: string;
@@ -89,13 +86,12 @@ const StatBlock = ({
   <div className="min-w-0">
     <div
       className={cn(
-        "truncate font-mono text-3xl font-bold tabular-nums tracking-tighter",
-        highlight ? "text-foreground" : "text-muted-foreground",
+        "truncate font-mono text-4xl font-light tabular-nums tracking-normal metallic-text",
       )}
     >
       {value}
     </div>
-    <div className="mt-1 flex items-center gap-1.5 text-xs tracking-wide text-muted-foreground">
+    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] tracking-wide text-muted-foreground/80">
       <span>{label}</span>
       {showHelp && <HelpTooltip>{help}</HelpTooltip>}
     </div>

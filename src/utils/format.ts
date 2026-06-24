@@ -22,9 +22,19 @@ export const formatDateTime = (timestamp: number) =>
     timeStyle: "short",
   });
 
-export const formatRelativeTime = (isoDate: string) => formatDuration(Date.now() - new Date(isoDate).getTime());
+export const formatRelativeTime = (isoDate: string) =>
+  formatDuration(Date.now() - new Date(isoDate).getTime());
 
-export const formatTimeAgo = (unixSeconds: number) => formatDuration(Date.now() - unixSeconds * 1000);
+export const formatTimeAgo = (unixSeconds: number) =>
+  formatDuration(Date.now() - unixSeconds * 1000);
+
+export const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
 
 const formatDuration = (diffMs: number) => {
   const minutes = Math.max(0, Math.round(diffMs / 60_000));

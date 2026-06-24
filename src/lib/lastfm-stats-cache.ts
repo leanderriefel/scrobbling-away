@@ -26,6 +26,8 @@ export type LastFmStatsCounts = {
 
 export type LastFmSyncStatus = "idle" | "running" | "complete" | "stopped" | "error";
 
+export type LastFmSyncMode = "quick" | "deep";
+
 export type LastFmSyncPhase =
   | "idle"
   | "profile"
@@ -34,6 +36,7 @@ export type LastFmSyncPhase =
   | "top-albums"
   | "top-tracks"
   | "recent-tracks"
+  | "reconcile"
   | "snapshot"
   | "complete";
 
@@ -42,6 +45,7 @@ export type LastFmSyncMeta = {
   username: string;
   status: LastFmSyncStatus;
   phase: LastFmSyncPhase;
+  mode?: LastFmSyncMode;
   message: string;
   fetched: number;
   total?: number;

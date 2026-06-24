@@ -1,19 +1,25 @@
-import { AlertCircleIcon, CheckCircle2Icon, LoaderCircleIcon, PauseCircleIcon } from "lucide-react";
+import { AlertCircleIcon, LoaderCircleIcon, PauseCircleIcon } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
 import type { LastFmStatsSnapshot } from "@/lib/lastfm-stats-cache";
-import { formatCompact, formatRelativeTime } from "@/utils/format";
+import { formatRelativeTime } from "@/utils/format";
 
 const phaseLabels: Record<string, string> = {
   complete: "Up to date",
   friends: "Finding your friends",
   idle: "Ready",
   profile: "Getting your profile",
+  reconcile: "Checking for changes",
   "recent-tracks": "Loading listening history",
   snapshot: "Preparing stats",
   "top-albums": "Loading top albums",
   "top-artists": "Loading top artists",
   "top-tracks": "Loading top tracks",
+};
+
+const modeLabels: Record<string, string> = {
+  quick: "Quick sync",
+  deep: "Deep sync",
 };
 
 export function SyncBar({
@@ -34,7 +40,7 @@ export function SyncBar({
   const label = active
     ? (phaseLabels[phase] ?? "Loading…")
     : status === "complete"
-      ? `Updated ${formatRelativeTime(snapshot?.updatedAt ?? new Date().toISOString())}`
+      ? `${sync?.mode ? (modeLabels[sync.mode] ?? "Sync") : "Updated"} ${formatRelativeTime(snapshot?.updatedAt ?? new Date().toISOString())}`
       : status === "error"
         ? (sync?.message ?? "Something went wrong")
         : status === "stopped"
@@ -45,23 +51,16 @@ export function SyncBar({
 
   if (!label) return null;
 
-  const detailParts = [
-    `${formatCompact(snapshot?.counts.recentTracks ?? 0)} scrobbles`,
-    `${formatCompact(snapshot?.counts.topArtists.overall ?? 0)} artists`,
-    sync?.updatedAt ? `status ${formatRelativeTime(sync.updatedAt)}` : undefined,
-  ].filter((part): part is string => Boolean(part));
   const StatusIcon = active
     ? LoaderCircleIcon
-    : status === "complete"
-      ? CheckCircle2Icon
-      : status === "error"
-        ? AlertCircleIcon
-        : status === "stopped"
-          ? PauseCircleIcon
-          : null;
+    : status === "error"
+      ? AlertCircleIcon
+      : status === "stopped"
+        ? PauseCircleIcon
+        : null;
 
   return (
-    <div className="grid gap-2 rounded-sm bg-accent/30 px-3 py-2.5">
+    <div className="glass-panel grid gap-2 rounded-sm px-3.5 py-3">
       <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
         {StatusIcon && (
           <StatusIcon
@@ -80,13 +79,6 @@ export function SyncBar({
         )}
       </div>
       {active && <Progress value={progress} className="h-[3px]" />}
-      {!active && detailParts.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
-          {detailParts.map((part) => (
-            <span key={part}>{part}</span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

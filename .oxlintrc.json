@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": [".agents/**", ".output/**", ".vercel/**", "dist/**"],
+  "ignorePatterns": [".agents/**", ".output/**", ".vercel/**", "dist/**", "public/streamsaver/**"],
   "plugins": ["typescript", "unicorn", "oxc"],
   "categories": {
     "correctness": "error"

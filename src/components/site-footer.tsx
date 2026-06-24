@@ -10,12 +10,13 @@ import {
 const CURRENT_YEAR = new Date().getFullYear();
 
 const footerLinkClass =
-  "text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline";
+  "text-muted-foreground underline-offset-4 transition-all duration-300 hover:text-foreground hover:underline hover:scale-[1.02] inline-block";
 
 export const SiteFooter = () => {
   return (
-    <footer className="mt-12 border-t border-border/60">
-      <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 text-[11px] text-muted-foreground">
+    <footer className="relative mt-12">
+      <div className="dither-border absolute top-0 left-0 right-0" />
+      <div className="mx-auto flex max-w-[960px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-5 text-[11px] text-muted-foreground">
         <p>© {CURRENT_YEAR} Leander Riefel</p>
         <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Dialog>

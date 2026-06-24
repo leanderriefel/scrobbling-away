@@ -81,7 +81,7 @@ function TrackRow({
   );
 
   const className =
-    "flex min-w-0 items-center gap-3 rounded-sm px-2 py-2 transition-colors duration-150 hover:bg-accent/60";
+    "group relative flex min-w-0 items-center gap-3 rounded-sm px-2 py-2 transition-all duration-300 ease-out hover:bg-accent/40 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[2px] before:rounded-full before:bg-primary before:opacity-0 before:transition-all before:duration-300 hover:before:opacity-100 hover:pl-3";
 
   if (onItemClick) {
     return (

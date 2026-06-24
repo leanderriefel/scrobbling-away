@@ -1,17 +1,25 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import {
-  DownloadIcon,
   LoaderCircleIcon,
+  MoreHorizontalIcon,
   PlusIcon,
+  ScanSearchIcon,
   SquareIcon,
   UsersIcon,
   XIcon,
+  ZapIcon,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   markAbandonedSyncStopped,
@@ -20,7 +28,11 @@ import {
   type LastFmPeriod,
   type LastFmStatsSnapshot,
 } from "@/lib/lastfm-stats-cache";
-import { hydrateStatsSnapshotFromCache, syncLastFmStats } from "@/lib/lastfm-stats-sync";
+import {
+  hydrateStatsSnapshotFromCache,
+  syncLastFmStats,
+  type LastFmSyncMode,
+} from "@/lib/lastfm-stats-sync";
 
 import { CompareDashboard } from "./compare-dashboard";
 import { SyncBar } from "./sync-bar";
@@ -210,7 +222,7 @@ export const CompareWorkspace = () => {
     addCompareUser(compareInput);
   };
 
-  const syncAll = async () => {
+  const syncAll = async (mode: LastFmSyncMode = "quick") => {
     if (compareUsernames.length < MIN_COMPARE_USERS) {
       toast.error(`Add at least ${MIN_COMPARE_USERS} users to compare.`);
       return;
@@ -227,14 +239,18 @@ export const CompareWorkspace = () => {
         if (controller.signal.aborted) break;
 
         await hydrateStatsSnapshotFromCache(username);
+        const snapshot = statsSnapshotsCollection.get(normalizeUsername(username));
+        const userMode: LastFmSyncMode =
+          mode === "deep" ? "deep" : hasCachedSnapshotData(snapshot) ? "quick" : "deep";
         await syncLastFmStats(username, {
+          mode: userMode,
           includeRecentTracks: true,
           signal: controller.signal,
         });
       }
 
       if (!controller.signal.aborted) {
-        toast.success("Compare data is ready.");
+        toast.success(mode === "quick" ? "New scrobbles synced." : "Full sync complete.");
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
@@ -273,14 +289,36 @@ export const CompareWorkspace = () => {
               Stop
             </Button>
           ) : (
-            <Button
-              type="button"
-              disabled={compareUsernames.length < MIN_COMPARE_USERS}
-              onClick={() => void syncAll()}
-            >
-              <DownloadIcon className="size-4" />
-              Sync all
-            </Button>
+            <>
+              <Button
+                type="button"
+                disabled={compareUsernames.length < MIN_COMPARE_USERS}
+                onClick={() => void syncAll("quick")}
+              >
+                <ZapIcon className="size-4" />
+                Quick sync all
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={compareUsernames.length < MIN_COMPARE_USERS}
+                    />
+                  }
+                >
+                  <MoreHorizontalIcon className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => void syncAll("deep")}>
+                    <ScanSearchIcon className="size-4" />
+                    Deep sync all
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           )}
         </form>
 
@@ -331,7 +369,7 @@ export const CompareWorkspace = () => {
               <span>
                 {hydratingUsernames.length > 0 ? "Loading stats for " : "No stats yet for "}
                 {pendingUsernames.map((name) => `@${name}`).join(", ")}
-                {hydratingUsernames.length > 0 ? "…" : ". Use Sync all to fetch."}
+                {hydratingUsernames.length > 0 ? "…" : ". Use Quick sync all to fetch."}
               </span>
             </div>
           </div>

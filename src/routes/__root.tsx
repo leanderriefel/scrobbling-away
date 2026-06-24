@@ -4,6 +4,7 @@ import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanst
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import Header from "@/components/header";
+import { ShaderBackground } from "@/components/shader-background";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,8 +48,9 @@ function RootDocument() {
         <HeadContent />
       </head>
       <body>
+        <ShaderBackground />
         <TooltipProvider>
-          <div className="flex min-h-svh flex-col">
+          <div className="relative z-10 flex min-h-svh flex-col">
             <Header />
             <div className="flex flex-1 flex-col">
               <Outlet />

@@ -43,7 +43,7 @@ const lastFmTopTrackSchema = z
     streamable: track.streamable?.streamable,
     fullTrack: track.streamable?.fullTrack,
     artist: track.artist,
-    images: track.image ?? [],
+    images: [] as Array<{ "#text": string; size: string }>,
   }));
 
 export const getTopTracksResponseSchema = z.object({

@@ -54,7 +54,8 @@ export function ChartBar({
   const bar = (
     <div
       className={cn(
-        "relative w-full overflow-hidden rounded-t-sm outline-none ring-foreground/20 transition-opacity duration-200 hover:opacity-100",
+        "relative w-full overflow-hidden rounded-t-sm outline-none ring-foreground/20 transition-all duration-300 hover:opacity-100 hover:shadow-[0_0_8px_rgba(94,106,210,0.45)]",
+        "after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-white/20 after:content-['']",
         className,
       )}
       style={{
